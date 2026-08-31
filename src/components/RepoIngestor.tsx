@@ -137,7 +137,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
       <h2 style={{ fontSize: '2.5rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
-        Automate your <span style={{ color: 'var(--accent-purple)' }}>.NET 8</span> Upgrades
+        Automate your <span style={{ color: 'var(--accent-purple)' }}>.NET</span> Upgrades
       </h2>
       <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', marginBottom: '40px', maxWidth: '600px' }}>
         Select a GitHub repository below. Our pipeline will clone, analyze, and generate a migration PR for your review.
