@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Code, ArrowRight, FolderGit2, Search, X, AlertTriangle } from 'lucide-react';
 
 interface Props {
-  onStart: (url: string, branch: string | null, commit: string | null) => void;
+  onStart: (url: string, branch: string | null, commit: string | null, targetFramework: string, customBranchName: string, customPrompt: string) => void;
   isStarted: boolean;
 }
 
@@ -37,6 +37,11 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
   
   const [commits, setCommits] = useState<Commit[]>([]);
   const [selectedCommit, setSelectedCommit] = useState<string>('');
+  
+  const [targetFramework, setTargetFramework] = useState<string>('net8.0');
+  const [customBranchName, setCustomBranchName] = useState<string>('');
+  const [customPrompt, setCustomPrompt] = useState<string>('');
+
   const [loading, setLoading] = useState(false);
   const [loadingCommits, setLoadingCommits] = useState(false);
   const [githubAuthError, setGithubAuthError] = useState(false);
@@ -193,9 +198,50 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
           </select>
         )}
 
+        {selectedRepo && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px', textAlign: 'left' }}>
+            <div>
+              <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Target .NET Framework</label>
+              <select 
+                className="input-glow"
+                value={targetFramework} 
+                onChange={(e) => setTargetFramework(e.target.value)}
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--panel-border)', background: 'white', marginTop: '4px' }}
+              >
+                <option value="net8.0">.NET 8.0 (LTS)</option>
+                <option value="net9.0">.NET 9.0</option>
+              </select>
+            </div>
+            
+            <div>
+              <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Custom Branch Name (Optional)</label>
+              <input 
+                type="text" 
+                className="input-glow"
+                placeholder="e.g. feature/upgrade-to-net8"
+                value={customBranchName}
+                onChange={(e) => setCustomBranchName(e.target.value)}
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--panel-border)', background: 'white', marginTop: '4px' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Additional AI Instructions (Optional)</label>
+              <textarea 
+                className="input-glow"
+                placeholder="e.g. Do not upgrade AutoMapper. Use Serilog instead of NLog."
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                rows={3}
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--panel-border)', background: 'white', marginTop: '4px', resize: 'vertical' }}
+              />
+            </div>
+          </div>
+        )}
+
         <button 
           className="btn-primary" 
-          onClick={() => onStart(selectedRepo, selectedBranch || null, selectedCommit || null)} 
+          onClick={() => onStart(selectedRepo, selectedBranch || null, selectedCommit || null, targetFramework, customBranchName, customPrompt)} 
           disabled={!selectedRepo} 
           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', opacity: selectedRepo ? 1 : 0.5, marginTop: '8px' }}
         >

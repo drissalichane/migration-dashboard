@@ -48,19 +48,24 @@ function App() {
   };
 
 
-  const startMigration = async (url: string, branch: string | null = null, commit: string | null = null) => {
+  const startMigration = async (repoUrl: string, branch: string | null, commit: string | null, targetFramework: string, customBranchName: string, customPrompt: string) => {
+    setIsStarted(true);
+    setCurrentJob(null);
     try {
+      const payload: any = { repositoryUrl: repoUrl };
+      if (branch) payload.targetBranch = branch;
+      if (commit) payload.targetCommit = commit;
+      if (targetFramework) payload.targetFramework = targetFramework;
+      if (customBranchName) payload.customBranchName = customBranchName;
+      if (customPrompt) payload.customPrompt = customPrompt;
+
       const res = await fetch('http://localhost:5153/api/migrationjob/analyze', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` 
         },
-        body: JSON.stringify({ 
-            repositoryUrl: url,
-            targetBranch: branch,
-            targetCommit: commit
-        })
+        body: JSON.stringify(payload)
       });
       
       const data = await res.json();

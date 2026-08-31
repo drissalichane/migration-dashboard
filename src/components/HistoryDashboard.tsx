@@ -11,6 +11,8 @@ interface MigrationJob {
   prUrl?: string;
   commitHash?: string;
   targetBranch?: string;
+  targetFramework?: string;
+  sourceFramework?: string;
   isArchived?: boolean;
 }
 
@@ -185,6 +187,11 @@ const HistoryDashboard: React.FC = () => {
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                     {new Date(job.createdAt).toLocaleString()}
                     {job.targetBranch && <span style={{ marginLeft: '12px' }}>Branch: <strong>{job.targetBranch}</strong></span>}
+                    {job.targetFramework && (
+                      <span style={{ marginLeft: '12px' }}>
+                        Version: <strong>{job.sourceFramework || 'Unknown'} ➔ {job.targetFramework}</strong>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
