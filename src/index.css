@@ -1,0 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-color: #faf9f6; /* Off-white / Beige */
+  --panel-bg: #ffffff;
+  --panel-border: #e2dfd8;
+  --text-primary: #2d2a26;
+  --text-secondary: #716e68;
+  --accent-brown: #8b5a2b; /* Warm brown */
+  --accent-purple: #9b7ead; /* Muted light purple */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  min-height: 100vh;
+  /* Very subtle, elegant gradient background */
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(139, 90, 43, 0.05), transparent 30%),
+    radial-gradient(circle at 85% 30%, rgba(155, 126, 173, 0.08), transparent 30%);
+  background-attachment: fixed;
+}
+
+/* Crisp, Flat UI Utilities */
+.glass-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.glass-panel:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-brown), var(--accent-purple));
+  border: none;
+  border-radius: 8px;
+  color: white;
+  padding: 10px 24px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(139, 90, 43, 0.2);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(155, 126, 173, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.input-glow {
+  background: #fdfcfa;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 12px 16px;
+  font-family: 'Inter', sans-serif;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input-glow:focus {
+  border-color: var(--accent-brown);
+  box-shadow: 0 0 0 3px rgba(139, 90, 43, 0.1);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent; 
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d0c8; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b5b0a5; 
+}
+
+/* Animations */
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(139, 90, 43, 0.3); }
+  70% { box-shadow: 0 0 0 8px rgba(139, 90, 43, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(139, 90, 43, 0); }
+}
+
+.pulse-active {
+  animation: pulseGlow 2s infinite;
+}
+
+/* Table overrides for light mode */
+table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+table tr {
+  border-bottom: 1px solid var(--panel-border) !important;
+}
