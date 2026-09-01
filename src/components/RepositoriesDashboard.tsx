@@ -31,7 +31,7 @@ const RepositoriesDashboard: React.FC = () => {
         </div>
         <div>
           <h2 style={{ margin: '0 0 4px 0', fontSize: '1.8rem', color: 'var(--text-primary)' }}>Migrated Repositories</h2>
-          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Repositories that have been processed by the .NET 8 Migration Pipeline.</p>
+          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Repositories that have been processed by the .NET Migration Pipeline.</p>
         </div>
       </div>
 
