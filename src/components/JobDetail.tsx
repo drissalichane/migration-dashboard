@@ -55,6 +55,7 @@ interface MigrationJob {
   llmUsageLogs?: any[];
   nodeExecutionLogs?: any[];
   repositoryProfileJson?: string;
+    migrationTasks?: any[];
   executionTimeMs?: number;
   phase1ExecutionTimeMs?: number;
   phase2ExecutionTimeMs?: number;
