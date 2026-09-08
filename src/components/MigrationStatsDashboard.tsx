@@ -43,7 +43,7 @@ const MigrationStatsDashboard: React.FC = () => {
     let phase2Attempted = 0;
 
     jobList.forEach(j => {
-      if (j.executionTimeMs) {
+      if (j.executionTimeMs && (j.status === 'Pending PR Review' || j.status === 'Failed Execution' || j.status === 'Approved and PR Created' || j.status === 'Merged' || j.status === 'Reverted')) {
         totalTime += j.executionTimeMs;
         timeCount++;
       }
