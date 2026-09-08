@@ -141,11 +141,15 @@ const JobDetail: React.FC = () => {
     return () => clearInterval(interval);
   }, [id]);
 
-  const handleApprovePlan = () => {
+  const handleApprovePlan = (customPrompt: string, updatedPlanJson?: string) => {
     if (!job) return;
     fetch(`http://localhost:5153/api/migrationjob/${job.id}/execute`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
+      headers: { 
+        'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ updatedPlanJson })
     })
     .then(r => r.json())
     .then(data => {
