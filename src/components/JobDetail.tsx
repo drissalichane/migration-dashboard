@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, CheckCircle, Clock, AlertCircle, FileText, CheckSquare, Search, Terminal,
+  ArrowLeft, CheckCircle, Clock, AlertCircle, FileText, CheckSquare, Search, Terminal, Activity, CheckCircle2,
   Archive, RefreshCcw, XCircle, PlayCircle, GitMerge, GitBranch,
   FileCode, Package, AlertTriangle, ExternalLink, Info,
   ChevronDown, ChevronRight, Lightbulb, BookOpen, X, GitCommit, RefreshCw
@@ -55,10 +55,17 @@ interface MigrationJob {
   llmUsageLogs?: any[];
   nodeExecutionLogs?: any[];
   repositoryProfileJson?: string;
-    migrationTasks?: any[];
+  migrationTasks?: any[];
   executionTimeMs?: number;
   phase1ExecutionTimeMs?: number;
   phase2ExecutionTimeMs?: number;
+  phase1Success?: boolean;
+  phase2Success?: boolean;
+  initialErrorCount?: number;
+  residualErrorCount?: number;
+  errorFixerIterations?: number;
+  successRate?: number;
+  regressionRate?: number;
   approvalRecords?: any[];
   mergeCommitSha?: string;
   revertPrUrl?: string;
@@ -914,6 +921,70 @@ const JobDetail: React.FC = () => {
         )}
       </div>
 
+      {/* Quantitative Metrics */}
+      {(job.executionTimeMs !== undefined && job.executionTimeMs !== null) && (
+        <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
+          <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+            <Activity size={20} color="#0969da" /> Quantitative Metrics
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '16px' }}>
+            <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #0969da' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Total Execution Time</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{(job.executionTimeMs / 1000).toFixed(1)}s</div>
+            </div>
+            
+            {job.phase1ExecutionTimeMs != null && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #8250df' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Phase 1 (Analysis) Time</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{(job.phase1ExecutionTimeMs / 1000).toFixed(1)}s</div>
+              </div>
+            )}
+            
+            {job.phase2ExecutionTimeMs != null && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #2da44e' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Phase 2 (Migration) Time</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{(job.phase2ExecutionTimeMs / 1000).toFixed(1)}s</div>
+              </div>
+            )}
+            
+            {job.initialErrorCount != null && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #cf222e' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Initial Compilation Errors</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{job.initialErrorCount}</div>
+              </div>
+            )}
+
+            {job.residualErrorCount != null && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: job.residualErrorCount > 0 ? '4px solid #cf222e' : '4px solid #2da44e' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Residual Errors</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{job.residualErrorCount}</div>
+              </div>
+            )}
+            
+            {job.errorFixerIterations != null && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #bf8700' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Fixer Iterations</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{job.errorFixerIterations}</div>
+              </div>
+            )}
+
+            {job.llmUsageLogs && job.llmUsageLogs.length > 0 && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #8957e5' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Total Tokens</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{(job.llmUsageLogs.reduce((acc, log) => acc + (log.totalTokens || 0), 0)).toLocaleString()}</div>
+              </div>
+            )}
+
+            {job.llmUsageLogs && job.llmUsageLogs.length > 0 && (
+              <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #0550ae' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Total Cost (USD)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>${(job.llmUsageLogs.reduce((acc, log) => acc + (log.totalCostUsd || 0), 0)).toFixed(4)}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Migration Plan Summary */}
       {plan && (
         <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
@@ -1315,10 +1386,35 @@ const JobDetail: React.FC = () => {
               <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
                 <Search size={20} color="#8957e5" /> Repository Scan Profile
               </h2>
-              <div style={{ background: '#f6f8fa', padding: '16px', borderRadius: '8px', overflowX: 'auto' }}>
-                <pre style={{ margin: 0, fontSize: '0.85rem', color: '#24292f' }}>
-                  {JSON.stringify(JSON.parse(job.repositoryProfileJson || '{}'), null, 2)}
-                </pre>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {(() => {
+                  try {
+                    const profile = JSON.parse(job.repositoryProfileJson || '{}');
+                    const items = Array.isArray(profile) ? profile : [profile];
+                    return items.map((item, idx) => (
+                      <div key={idx} style={{ background: '#f6f8fa', border: '1px solid var(--panel-border)', padding: '16px', borderRadius: '8px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Project Path</div>
+                          <div style={{ fontWeight: '500', color: 'var(--text-primary)', wordBreak: 'break-all' }}>{item.Path || item.path || 'N/A'}</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Target Framework</div>
+                          <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+                            <span style={{ padding: '4px 8px', background: '#e6f4ea', color: '#1a7f37', borderRadius: '12px', fontSize: '0.85rem' }}>
+                              {item.TargetFramework || item.targetFramework || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Project Type</div>
+                          <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>{item.ProjectType || item.projectType || 'N/A'}</div>
+                        </div>
+                      </div>
+                    ));
+                  } catch (e) {
+                    return <div style={{ color: 'var(--error)' }}>Failed to parse profile JSON.</div>;
+                  }
+                })()}
               </div>
             </div>
           )}
@@ -1421,6 +1517,42 @@ const JobDetail: React.FC = () => {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Job Tasks */}
+          {job.migrationTasks && job.migrationTasks.length > 0 && (
+            <div className="glass-panel" style={{ padding: '24px' }}>
+              <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+                <CheckSquare size={20} color="#0969da" /> Job Tasks ({job.migrationTasks.length})
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {job.migrationTasks.map((task: any, idx: number) => {
+                  const statusColors: any = {
+                    'Todo': { bg: '#fff8c5', color: '#9a6700' },
+                    'Started': { bg: '#ddf4ff', color: '#0969da' },
+                    'Review': { bg: '#fbefff', color: '#8250df' },
+                    'Finished': { bg: '#e6f4ea', color: '#1a7f37' },
+                  };
+                  const sc = statusColors[task.status] || { bg: '#f6f8fa', color: 'var(--text-secondary)' };
+                  return (
+                    <div key={idx} style={{ padding: '12px 16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: `4px solid ${sc.color}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{task.title}</div>
+                        {task.description && <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{task.description}</div>}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                        {task.assignedToUserId && (
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Assigned: #{task.assignedToUserId}</span>
+                        )}
+                        <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 600, background: sc.bg, color: sc.color }}>
+                          {task.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
