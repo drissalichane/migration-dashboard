@@ -24,7 +24,7 @@ export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
 
   const togglePriority = (section: string, itemIndex: number, changeIndex?: number) => {
     setLocalPlan((prev: any) => {
-      const newPlan = { ...prev };
+      const newPlan = JSON.parse(JSON.stringify(prev));
       
       if (section === 'file_changes' && changeIndex !== undefined) {
         const current = newPlan.file_changes[itemIndex].changes[changeIndex].priority || 'must';
