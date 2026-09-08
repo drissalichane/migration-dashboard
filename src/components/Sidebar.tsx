@@ -1,15 +1,20 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, History, Settings, GitPullRequest } from 'lucide-react';
+import { LayoutDashboard, History, Settings, GitPullRequest, BookOpen, Shield, FolderGit2, BarChart2 } from 'lucide-react';
 
 const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const menuItems = [
+  const userRole = localStorage.getItem('user_role') || 'Dev';
+
+    const menuItems = [
     { path: '/', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { path: '/projects', label: 'Projects', icon: <FolderGit2 size={18} /> },
     { path: '/history', label: 'Migration History', icon: <History size={18} /> },
-    { path: '/repositories', label: 'Repositories', icon: <GitPullRequest size={18} /> },
+    { path: '/stats', label: 'Migration Stats', icon: <BarChart2 size={18} /> },
+    { path: '/rules', label: 'Knowledge Base', icon: <BookOpen size={18} /> },
+    ...(userRole === 'Manager' || userRole === 'Admin' ? [{ path: '/governance', label: 'Team Management', icon: <Shield size={18} /> }] : []),
     { path: '/settings', label: 'Settings', icon: <Settings size={18} /> }
   ];
 

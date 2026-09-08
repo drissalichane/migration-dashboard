@@ -14,6 +14,8 @@ interface MigrationJob {
   targetFramework?: string;
   sourceFramework?: string;
   isArchived?: boolean;
+  team?: { name: string };
+  assignedToUser?: { name: string };
 }
 
 const HistoryDashboard: React.FC = () => {
@@ -26,7 +28,8 @@ const HistoryDashboard: React.FC = () => {
 
   const fetchJobs = () => {
     setLoading(true);
-    fetch('http://localhost:5153/api/migrationjob', {
+    const username = localStorage.getItem('user_name') || '';
+    fetch(`http://localhost:5153/api/migrationjob?username=${encodeURIComponent(username)}`, {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
     })
       .then(r => r.json())
@@ -45,7 +48,7 @@ const HistoryDashboard: React.FC = () => {
     if (selectedJobs.length === 0) return;
     setIsArchiving(true);
     try {
-      const res = await fetch('http://localhost:5153/api/migrationjob/bulk-archive', {
+      const res = await fetch(`http://localhost:5153/api/migrationjob/bulk-archive?username=${localStorage.getItem('user_name') || ''}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,9 +106,8 @@ const HistoryDashboard: React.FC = () => {
         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', margin: 0 }}>
           <Clock size={20} /> Migration History
         </h3>
-        
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {selectedJobs.length > 0 && (
+          {selectedJobs.length > 0 && (localStorage.getItem('user_role') === 'Admin' || localStorage.getItem('user_role') === 'Manager') && (
             <button 
               className="btn btn-secondary" 
               onClick={handleBulkArchive}
@@ -193,6 +195,12 @@ const HistoryDashboard: React.FC = () => {
                       </span>
                     )}
                   </div>
+                  {(job.team || job.assignedToUser) && (
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '8px', display: 'flex', gap: '12px' }}>
+                      {job.team && <span>Team: <strong>{job.team.name}</strong></span>}
+                      {job.assignedToUser && <span>Assignee: <strong>{job.assignedToUser.name}</strong></span>}
+                    </div>
+                  )}
                 </div>
               </div>
 

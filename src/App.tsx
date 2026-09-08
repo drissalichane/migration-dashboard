@@ -6,12 +6,17 @@ import RepoIngestor from './components/RepoIngestor';
 import Login from './components/Login';
 import HistoryDashboard from './components/HistoryDashboard';
 import JobDetail from './components/JobDetail';
-import RepositoriesDashboard from './components/RepositoriesDashboard';
+import MigrationStatsDashboard from './components/MigrationStatsDashboard';
+import KnowledgeBase from './components/KnowledgeBase';
+import Governance from './components/Governance';
+import Projects from './components/Projects';
+import Settings from './components/Settings';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userName, setUserName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   
   const navigate = useNavigate();
 
@@ -36,7 +41,12 @@ function App() {
     setAvatarUrl(localStorage.getItem('avatar_url') || '');
   };
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setIsLogoutModalOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLogoutModalOpen(false);
     localStorage.removeItem('jwt_token');
     localStorage.removeItem('user_role');
     localStorage.removeItem('user_name');
@@ -49,8 +59,6 @@ function App() {
 
 
   const startMigration = async (repoUrl: string, branch: string | null, commit: string | null, targetFramework: string, customBranchName: string, customPrompt: string) => {
-    setIsStarted(true);
-    setCurrentJob(null);
     try {
       const payload: any = { repositoryUrl: repoUrl };
       if (branch) payload.targetBranch = branch;
@@ -94,22 +102,34 @@ function App() {
       <Sidebar />
       
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Navbar userName={userName} avatarUrl={avatarUrl} onLogout={handleLogout} />
+        <Navbar userName={userName} avatarUrl={avatarUrl} onLogout={handleLogoutClick} />
         
-        <main style={{ padding: '32px 48px', overflowY: 'auto', flex: 1 }}>
+        <main style={{ padding: '32px 48px', overflowY: 'auto', flex: 1, position: 'relative' }}>
           <Routes>
             <Route path="/" element={<DashboardView />} />
             <Route path="/login" element={<DashboardView />} />
             <Route path="/history" element={<HistoryDashboard />} />
             <Route path="/jobs/:id" element={<JobDetail />} />
-            <Route path="/repositories" element={<RepositoriesDashboard />} />
-            <Route path="/settings" element={
-              <div className="glass-panel" style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <h3>Settings</h3>
-                <p>Configure pipeline settings and credentials.</p>
-              </div>
-            } />
+            <Route path="/stats" element={<MigrationStatsDashboard />} />
+            <Route path="/rules" element={<KnowledgeBase />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/governance" element={<Governance />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
+
+          {/* LOGOUT CONFIRMATION MODAL */}
+          {isLogoutModalOpen && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(8px)' }}>
+              <div className="glass-panel" style={{ width: '400px', padding: '24px', textAlign: 'center' }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem' }}>Confirm Logout</h3>
+                <p style={{ margin: '0 0 24px 0', color: 'var(--text-secondary)' }}>Are you sure you want to log out of your session?</p>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                  <button className="btn-secondary" onClick={() => setIsLogoutModalOpen(false)}>Cancel</button>
+                  <button className="btn-primary" onClick={confirmLogout} style={{ background: '#cf222e' }}>Logout</button>
+                </div>
+              </div>
+            </div>
+          )}
         </main>
       </div>
     </div>

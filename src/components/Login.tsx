@@ -18,12 +18,16 @@ const Login: React.FC<Props> = ({ onLogin }) => {
     const userRole = params.get('role');
     const userName = params.get('name');
     const avatar = params.get('avatar');
+    const userId = params.get('userId');
+    const teamId = params.get('teamId');
     
     if (token && userRole) {
       localStorage.setItem('jwt_token', token);
       localStorage.setItem('user_role', userRole);
       if (userName) localStorage.setItem('user_name', userName);
       if (avatar) localStorage.setItem('avatar_url', avatar);
+      if (userId && userId !== 'null' && userId !== 'undefined') localStorage.setItem('user_id', userId);
+      if (teamId && teamId !== 'null' && teamId !== 'undefined') localStorage.setItem('team_id', teamId);
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
       onLogin(token, userRole);
@@ -65,6 +69,8 @@ const Login: React.FC<Props> = ({ onLogin }) => {
       } else {
         localStorage.setItem('jwt_token', data.token);
         localStorage.setItem('user_role', data.role);
+        if (data.userId) localStorage.setItem('user_id', data.userId.toString());
+        if (data.teamId) localStorage.setItem('team_id', data.teamId.toString());
         onLogin(data.token, data.role);
       }
     } catch (err: any) {

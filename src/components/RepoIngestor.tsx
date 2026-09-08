@@ -6,14 +6,11 @@ interface Props {
   isStarted: boolean;
 }
 
-interface Repository {
+interface Project {
   id: number;
   name: string;
-  fullName: string;
-  htmlUrl: string;
-  cloneUrl: string;
-  language: string;
-  owner: string;
+  repositoryUrl: string;
+  organizationId: number;
 }
 
 interface Commit {
@@ -25,12 +22,12 @@ interface Commit {
 }
 
 const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
-  const [repos, setRepos] = useState<Repository[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState<string>('');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  const filteredRepos = repos.filter(r => r.fullName.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredProjects = projects.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.repositoryUrl.toLowerCase().includes(searchQuery.toLowerCase()));
   
   const [branches, setBranches] = useState<{name: string, commitSha: string}[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<string>('');
@@ -49,7 +46,8 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
   useEffect(() => {
     if (isStarted) return;
     setLoading(true);
-    fetch('http://localhost:5153/api/github/repos', {
+    const username = localStorage.getItem('user_name') || '';
+    fetch(`http://localhost:5153/api/projects?username=${encodeURIComponent(username)}`, {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
     })
     .then(async r => {
@@ -61,28 +59,37 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
     })
     .then(data => {
       if (Array.isArray(data)) {
-        setRepos(data);
+        setProjects(data);
       }
       setLoading(false);
     })
     .catch((err) => {
-      if (err.message?.includes('Bad credentials') || err.message?.includes('Unauthorized')) {
-        setGithubAuthError(true);
-      }
+      console.error(err);
       setLoading(false);
     });
   }, [isStarted]);
 
+  const getOwnerRepo = (url: string) => {
+    const match = url.match(/github\.com[:/]([^\/]+)\/([^\/.]+)/);
+    if (!match) return null;
+    let name = match[2];
+    if (name.endsWith('.git')) name = name.substring(0, name.length - 4);
+    return { owner: match[1], name };
+  };
+
   useEffect(() => {
-    if (!selectedRepo) {
+    if (!selectedProjectId) {
       setBranches([]);
       setSelectedBranch('');
       return;
     }
-    const repo = repos.find(r => r.cloneUrl === selectedRepo);
-    if (!repo) return;
+    const project = projects.find(p => p.id === selectedProjectId);
+    if (!project) return;
 
-    fetch(`http://localhost:5153/api/github/repos/${repo.owner}/${repo.name}/branches`, {
+    const repoDetails = getOwnerRepo(project.repositoryUrl);
+    if (!repoDetails) return;
+
+    fetch(`http://localhost:5153/api/github/repos/${repoDetails.owner}/${repoDetails.name}/branches`, {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
     })
     .then(async r => {
@@ -100,20 +107,23 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
         setGithubAuthError(true);
       }
     });
-  }, [selectedRepo, repos]);
+  }, [selectedProjectId, projects]);
 
   useEffect(() => {
-    if (!selectedRepo) {
+    if (!selectedProjectId) {
       setCommits([]);
       setSelectedCommit('');
       return;
     }
-    const repo = repos.find(r => r.cloneUrl === selectedRepo);
-    if (!repo) return;
+    const project = projects.find(p => p.id === selectedProjectId);
+    if (!project) return;
+
+    const repoDetails = getOwnerRepo(project.repositoryUrl);
+    if (!repoDetails) return;
 
     setLoadingCommits(true);
     const branchQuery = selectedBranch ? `?branch=${selectedBranch}` : '';
-    fetch(`http://localhost:5153/api/github/repos/${repo.owner}/${repo.name}/commits${branchQuery}`, {
+    fetch(`http://localhost:5153/api/github/repos/${repoDetails.owner}/${repoDetails.name}/commits${branchQuery}`, {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
     })
     .then(async r => {
@@ -133,11 +143,26 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
       }
       setLoadingCommits(false);
     });
-  }, [selectedRepo, selectedBranch, repos]);
+  }, [selectedProjectId, selectedBranch, projects]);
 
   if (isStarted) return null;
   
-  const selectedRepoObj = repos.find(r => r.cloneUrl === selectedRepo);
+  const selectedProjectObj = projects.find(p => p.id === selectedProjectId);
+
+  if (!loading && projects.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
+        <h2 style={{ fontSize: '2.5rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>
+          Automate your <span style={{ color: 'var(--accent-purple)' }}>.NET</span> Upgrades
+        </h2>
+        <div style={{ padding: '24px', background: '#fff5f5', borderRadius: '8px', border: '1px solid #ffc9c9', color: '#c92a2a', maxWidth: '600px' }}>
+          <AlertTriangle size={32} style={{ marginBottom: '16px' }} />
+          <h3 style={{ margin: '0 0 8px 0' }}>No Assigned Projects</h3>
+          <p style={{ margin: 0 }}>You are not assigned to any migration projects yet. Please contact your manager or an admin to be assigned to a project before you can start a migration.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 24px', textAlign: 'center' }}>
@@ -145,7 +170,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
         Automate your <span style={{ color: 'var(--accent-purple)' }}>.NET</span> Upgrades
       </h2>
       <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', marginBottom: '40px', maxWidth: '600px' }}>
-        Select a GitHub repository below. Our pipeline will clone, analyze, and generate a migration PR for your review.
+        Select an assigned project below. Our pipeline will clone, analyze, and generate a migration PR for your review.
       </p>
 
       <div className="glass-panel" style={{ padding: '24px', width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -162,7 +187,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <FolderGit2 size={24} color="var(--accent-purple)" />
             <span style={{ fontWeight: 600 }}>
-              {selectedRepoObj ? selectedRepoObj.fullName : 'Select a GitHub Repository...'}
+              {selectedProjectObj ? selectedProjectObj.name : 'Select a Project...'}
             </span>
           </div>
           <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Browse</span>
@@ -198,7 +223,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
           </select>
         )}
 
-        {selectedRepo && (
+        {selectedProjectId && selectedProjectObj && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px', textAlign: 'left' }}>
             <div>
               <label style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Target .NET Framework</label>
@@ -241,9 +266,9 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
 
         <button 
           className="btn-primary" 
-          onClick={() => onStart(selectedRepo, selectedBranch || null, selectedCommit || null, targetFramework, customBranchName, customPrompt)} 
-          disabled={!selectedRepo} 
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', opacity: selectedRepo ? 1 : 0.5, marginTop: '8px' }}
+          onClick={() => onStart(selectedProjectObj!.repositoryUrl, selectedBranch || null, selectedCommit || null, targetFramework, customBranchName, customPrompt)} 
+          disabled={!selectedProjectId} 
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', opacity: selectedProjectId ? 1 : 0.5, marginTop: '8px' }}
         >
           Create Migration PR <ArrowRight size={18} />
         </button>
@@ -263,7 +288,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
           }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--panel-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <FolderGit2 size={20} /> Select Repository
+                <FolderGit2 size={20} /> Select Project
               </h3>
               <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
                 <X size={24} />
@@ -275,7 +300,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
                 <Search size={18} style={{ position: 'absolute', left: '14px', top: '12px', color: 'var(--text-secondary)' }} />
                 <input 
                   type="text" 
-                  placeholder="Search repositories..."
+                  placeholder="Search assigned projects..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: '8px', border: '1px solid var(--panel-border)', background: '#f8f9fa', fontSize: '1rem', outline: 'none' }}
@@ -286,16 +311,16 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
 
             <div style={{ padding: '24px', overflowY: 'auto', flex: 1 }}>
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Loading repositories...</div>
-              ) : filteredRepos.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No repositories found.</div>
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Loading projects...</div>
+              ) : filteredProjects.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No projects match your search.</div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                  {filteredRepos.map(r => (
+                  {filteredProjects.map(p => (
                     <button
-                      key={r.id}
+                      key={p.id}
                       onClick={() => {
-                        setSelectedRepo(r.cloneUrl);
+                        setSelectedProjectId(p.id);
                         setIsModalOpen(false);
                         setSearchQuery('');
                       }}
@@ -317,11 +342,8 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.02)';
                       }}
                     >
-                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{r.name}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{r.owner}</div>
-                      <div style={{ display: 'inline-block', padding: '2px 8px', background: '#f1f8ff', color: '#0366d6', borderRadius: '12px', fontSize: '0.75rem', marginTop: '4px', alignSelf: 'flex-start' }}>
-                        {r.language || 'Unknown'}
-                      </div>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{p.name}</div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{p.repositoryUrl}</div>
                     </button>
                   ))}
                 </div>
@@ -351,7 +373,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
               </button>
             </div>
             <div style={{ padding: '24px' }}>
-              <p style={{ margin: '0 0 24px 0', color: 'var(--text-primary)' }}>Your GitHub access token has expired or is invalid. Please reconnect your account to view files and commits.</p>
+              <p style={{ margin: '0 0 24px 0', color: 'var(--text-primary)' }}>Your GitHub access token has expired or is invalid. Please reconnect your account to view branches and commits.</p>
               
               <button 
                 onClick={() => { localStorage.clear(); window.location.href = 'http://localhost:5153/api/auth/github'; }}

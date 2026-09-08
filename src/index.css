@@ -125,3 +125,87 @@ table th {
 table tr {
   border-bottom: 1px solid var(--panel-border) !important;
 }
+
+/* Missing Input Field Styles */
+.input-field {
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 10px 14px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  width: 100%;
+  outline: none;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.input-field:focus {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 0 3px rgba(155, 126, 173, 0.15), inset 0 1px 2px rgba(0,0,0,0.02);
+}
+
+/* Missing Button Styles */
+.btn-secondary {
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  padding: 10px 24px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+
+.btn-secondary:hover {
+  background: #fdfcfa;
+  border-color: #d1cdc1;
+  color: var(--text-primary);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Badge Styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Rule Card Styles */
+.rule-card {
+  padding: 20px;
+  transition: all 0.3s ease;
+  border: 1px solid var(--panel-border);
+  background: #ffffff;
+}
+
+.rule-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-purple);
+  box-shadow: 0 8px 24px rgba(155, 126, 173, 0.12);
+}
+
+.code-block {
+  background: #f6f8fa;
+  border: 1px solid #e2dfd8;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

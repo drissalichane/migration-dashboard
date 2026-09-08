@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Play, CheckCircle, Package, GitMerge, FileCode, AlertTriangle } from 'lucide-react';
 
 interface Props {
   planJson: string;
-  onApprove: () => void;
+  onApprove: (customPrompt: string) => void;
 }
 
 export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
+  const [customPrompt, setCustomPrompt] = useState('');
+  
   let plan = null;
   try {
     plan = JSON.parse(planJson);
@@ -22,7 +24,7 @@ export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
           LLM Migration Plan Review
         </h3>
         <button 
-          onClick={onApprove} 
+          onClick={() => onApprove(customPrompt)} 
           style={{ 
             display: 'flex', alignItems: 'center', gap: '8px',
             background: 'linear-gradient(135deg, #8250df, #0969da)',
@@ -45,6 +47,18 @@ export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
         </button>
       </div>
       <div className="panel-body">
+        
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{ margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FileCode size={18} /> Execution Override Prompt (Optional)
+          </h4>
+          <textarea
+            value={customPrompt}
+            onChange={(e) => setCustomPrompt(e.target.value)}
+            placeholder="E.g. 'Do not use AutoMapper, map objects manually' or 'Ensure all controllers use async/await'"
+            style={{ width: '100%', height: '80px', padding: '12px', borderRadius: '6px', border: '1px solid var(--panel-border)', fontFamily: 'inherit', fontSize: '14px', resize: 'vertical' }}
+          />
+        </div>
         
         {plan.risk_level && (
           <div style={{ marginBottom: '20px', padding: '12px', borderRadius: '6px', backgroundColor: plan.risk_level === 'high' ? '#ffebe9' : '#fff8c5', border: `1px solid ${plan.risk_level === 'high' ? 'rgba(255,129,130,0.4)' : 'rgba(212,167,44,0.4)'}` }}>
