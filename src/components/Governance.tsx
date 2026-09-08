@@ -54,6 +54,8 @@ export const Governance: React.FC = () => {
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [selectedTask, setSelectedTask] = useState<MigrationTask | null>(null);
+  const [isEditingTaskDesc, setIsEditingTaskDesc] = useState(false);
+  const [taskDescBuffer, setTaskDescBuffer] = useState('');
   const [newComment, setNewComment] = useState('');
 
   // Form State - User
@@ -194,6 +196,24 @@ export const Governance: React.FC = () => {
       });
       // Optimistically update
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const updateTaskDescription = async (taskId: number, newDesc: string) => {
+    try {
+      const res = await fetch(`http://localhost:5153/api/tasks/${taskId}/description`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: newDesc })
+      });
+      if (res.ok) {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, description: newDesc } : t));
+        if (selectedTask && selectedTask.id === taskId) {
+          setSelectedTask(prev => prev ? { ...prev, description: newDesc } : null);
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -549,7 +569,33 @@ export const Governance: React.FC = () => {
               </button>
             </div>
             
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.5 }}>{selectedTask.description}</p>
+            {isEditingTaskDesc ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <textarea 
+                  style={{ width: '100%', minHeight: '100px', padding: '12px', borderRadius: '6px', border: '1px solid var(--primary)', fontSize: '0.95rem', fontFamily: 'inherit', resize: 'vertical' }}
+                  value={taskDescBuffer}
+                  onChange={(e) => setTaskDescBuffer(e.target.value)}
+                  autoFocus
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button className="btn-secondary" onClick={() => setIsEditingTaskDesc(false)}>Cancel</button>
+                  <button className="btn-primary" onClick={() => { updateTaskDescription(selectedTask.id, taskDescBuffer); setIsEditingTaskDesc(false); }}>Save</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.5, whiteSpace: 'pre-wrap', paddingRight: '24px' }}>
+                  {selectedTask.description || <span style={{ fontStyle: 'italic', opacity: 0.5 }}>No description provided...</span>}
+                </p>
+                <button 
+                  onClick={() => { setTaskDescBuffer(selectedTask.description); setIsEditingTaskDesc(true); }}
+                  style={{ position: 'absolute', top: '-4px', right: '0', background: 'white', border: '1px solid var(--panel-border)', borderRadius: '4px', padding: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                  title="Edit Description"
+                >
+                  <Edit size={14} color="var(--text-secondary)" />
+                </button>
+              </div>
+            )}
             
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: '#f6f8fa', padding: '16px', borderRadius: '8px' }}>
               <div>
