@@ -1444,17 +1444,17 @@ const JobDetail: React.FC = () => {
                         <tr style={{ borderBottom: '1px solid var(--panel-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
                           <th style={{ padding: '8px' }}>Time</th>
                           <th style={{ padding: '8px' }}>Agent</th>
-                          <th style={{ padding: '8px' }}>Provider</th>
+                          <th style={{ padding: '8px' }}>LLM</th>
                           <th style={{ padding: '8px', textAlign: 'right' }}>Tokens</th>
                           <th style={{ padding: '8px', textAlign: 'right' }}>Cost</th>
                         </tr>
                       </thead>
                       <tbody>
                         {job.llmUsageLogs.map((log: any, idx: number) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid var(--bg-primary)' }}>
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--panel-border)', fontSize: '0.9rem' }}>
                             <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{new Date(log.createdAt).toLocaleTimeString()}</td>
                             <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{log.agentName}</td>
-                            <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{log.provider}</td>
+                            <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{log.modelName || log.provider}</td>
                             <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{log.totalTokens?.toLocaleString()}</td>
                             <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: '#1a7f37' }}>${(log.totalCostUsd || 0).toFixed(4)}</td>
                           </tr>
@@ -1499,10 +1499,12 @@ const JobDetail: React.FC = () => {
                           <td style={{ padding: '8px 4px' }}>{(node.executionTimeMs / 1000).toFixed(2)}s</td>
                         </tr>
                       ))}
-                      {(job.executionTimeMs || 0) > 0 && (
+                      {(job.nodeExecutionLogs?.length || 0) > 0 && (
                         <tr style={{ background: '#f6f8fa' }}>
                           <td colSpan={2} style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Total Execution Time:</td>
-                          <td style={{ padding: '8px 4px', fontWeight: 600, color: '#0969da' }}>{((job.executionTimeMs || 0) / 1000).toFixed(2)}s</td>
+                          <td style={{ padding: '8px 4px', fontWeight: 600, color: '#0969da' }}>
+                            {(job.nodeExecutionLogs.reduce((acc: number, cur: any) => acc + (cur.executionTimeMs || 0), 0) / 1000).toFixed(2)}s
+                          </td>
                         </tr>
                       )}
                     </tbody>
