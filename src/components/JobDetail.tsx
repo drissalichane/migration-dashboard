@@ -1419,81 +1419,86 @@ const JobDetail: React.FC = () => {
             </div>
           )}
 
-          {/* LLM Telemetry (Cost & Time) */}
-          {job.llmUsageLogs && job.llmUsageLogs.length > 0 && (
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={18} /> LLM Telemetry & Costs
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--panel-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '8px' }}>Time</th>
-                      <th style={{ padding: '8px' }}>Agent</th>
-                      <th style={{ padding: '8px' }}>Provider</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Tokens</th>
-                      <th style={{ padding: '8px', textAlign: 'right' }}>Cost</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {job.llmUsageLogs.map((log: any, idx: number) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--bg-primary)' }}>
-                        <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{new Date(log.createdAt).toLocaleTimeString()}</td>
-                        <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{log.agentName}</td>
-                        <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{log.provider}</td>
-                        <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{log.totalTokens?.toLocaleString()}</td>
-                        <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: '#1a7f37' }}>${(log.totalCostUsd || 0).toFixed(4)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={4} style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600 }}>Total:</td>
-                      <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: '#1a7f37' }}>
-                        ${job.llmUsageLogs.reduce((acc: number, log: any) => acc + (log.totalCostUsd || 0), 0).toFixed(4)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          )}
+          {/* LLM Telemetry & Node Timings Row */}
+          {((job.llmUsageLogs && job.llmUsageLogs.length > 0) || (job.nodeExecutionLogs && job.nodeExecutionLogs.length > 0)) && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+              {/* LLM Telemetry (Cost & Time) */}
+              {job.llmUsageLogs && job.llmUsageLogs.length > 0 && (
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Activity size={18} /> LLM Telemetry & Costs
+                  </h3>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--panel-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                          <th style={{ padding: '8px' }}>Time</th>
+                          <th style={{ padding: '8px' }}>Agent</th>
+                          <th style={{ padding: '8px' }}>Provider</th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>Tokens</th>
+                          <th style={{ padding: '8px', textAlign: 'right' }}>Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {job.llmUsageLogs.map((log: any, idx: number) => (
+                          <tr key={idx} style={{ borderBottom: '1px solid var(--bg-primary)' }}>
+                            <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{new Date(log.createdAt).toLocaleTimeString()}</td>
+                            <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{log.agentName}</td>
+                            <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{log.provider}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{log.totalTokens?.toLocaleString()}</td>
+                            <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: '#1a7f37' }}>${(log.totalCostUsd || 0).toFixed(4)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colSpan={4} style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600 }}>Total:</td>
+                          <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: '#1a7f37' }}>
+                            ${job.llmUsageLogs.reduce((acc: number, log: any) => acc + (log.totalCostUsd || 0), 0).toFixed(4)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
 
-          {/* Node Timings */}
-          {job.nodeExecutionLogs && job.nodeExecutionLogs.length > 0 && (
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-                <Clock size={20} color="#0969da" /> Agent Node Timings
-              </h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--panel-border)' }}>
-                    <th style={{ padding: '8px 4px' }}>Phase</th>
-                    <th style={{ padding: '8px 4px' }}>Node Name</th>
-                    <th style={{ padding: '8px 4px' }}>Execution Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {job.nodeExecutionLogs.map((node: any, idx: number) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid var(--panel-border)' }}>
-                      <td style={{ padding: '8px 4px' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', background: node.phase === 'Phase1' ? '#ddf4ff' : '#e6f4ea', color: node.phase === 'Phase1' ? '#0969da' : '#1a7f37' }}>
-                          {node.phase}
-                        </span>
-                      </td>
-                      <td style={{ padding: '8px 4px', fontWeight: 500 }}>{node.nodeName}</td>
-                      <td style={{ padding: '8px 4px' }}>{(node.executionTimeMs / 1000).toFixed(2)}s</td>
-                    </tr>
-                  ))}
-                  {(job.executionTimeMs || 0) > 0 && (
-                    <tr style={{ background: '#f6f8fa' }}>
-                      <td colSpan={2} style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Total Execution Time:</td>
-                      <td style={{ padding: '8px 4px', fontWeight: 600, color: '#0969da' }}>{((job.executionTimeMs || 0) / 1000).toFixed(2)}s</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              {/* Node Timings */}
+              {job.nodeExecutionLogs && job.nodeExecutionLogs.length > 0 && (
+                <div className="glass-panel" style={{ padding: '24px' }}>
+                  <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+                    <Clock size={20} color="#0969da" /> Agent Node Timings
+                  </h2>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid var(--panel-border)' }}>
+                        <th style={{ padding: '8px 4px' }}>Phase</th>
+                        <th style={{ padding: '8px 4px' }}>Node Name</th>
+                        <th style={{ padding: '8px 4px' }}>Execution Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {job.nodeExecutionLogs.map((node: any, idx: number) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--panel-border)' }}>
+                          <td style={{ padding: '8px 4px' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', background: node.phase === 'Phase1' ? '#ddf4ff' : '#e6f4ea', color: node.phase === 'Phase1' ? '#0969da' : '#1a7f37' }}>
+                              {node.phase}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 4px', fontWeight: 500 }}>{node.nodeName}</td>
+                          <td style={{ padding: '8px 4px' }}>{(node.executionTimeMs / 1000).toFixed(2)}s</td>
+                        </tr>
+                      ))}
+                      {(job.executionTimeMs || 0) > 0 && (
+                        <tr style={{ background: '#f6f8fa' }}>
+                          <td colSpan={2} style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Total Execution Time:</td>
+                          <td style={{ padding: '8px 4px', fontWeight: 600, color: '#0969da' }}>{((job.executionTimeMs || 0) / 1000).toFixed(2)}s</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
