@@ -1522,11 +1522,11 @@ const JobDetail: React.FC = () => {
           )}
 
           {/* Job Tasks */}
-          {job.migrationTasks && job.migrationTasks.length > 0 && (
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-                <CheckSquare size={20} color="#0969da" /> Job Tasks ({job.migrationTasks.length})
-              </h2>
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+              <CheckSquare size={20} color="#0969da" /> Job Tasks ({job.migrationTasks?.length || 0})
+            </h2>
+            {job.migrationTasks && job.migrationTasks.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {job.migrationTasks.map((task: any, idx: number) => {
                   const statusColors: any = {
@@ -1554,8 +1554,12 @@ const JobDetail: React.FC = () => {
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem', background: '#f6f8fa', borderRadius: '8px' }}>
+                No tasks assigned to this job yet.
+              </div>
+            )}
+          </div>
         </div>
       {/* Conflict Modal */}
       {isConflictModalOpen && (
