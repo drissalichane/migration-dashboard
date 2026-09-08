@@ -4,7 +4,7 @@ import {
   ArrowLeft, CheckCircle, Clock, AlertCircle, FileText, CheckSquare, Search, Terminal, Activity, CheckCircle2,
   Archive, RefreshCcw, XCircle, PlayCircle, GitMerge, GitBranch,
   FileCode, Package, AlertTriangle, ExternalLink, Info,
-  ChevronDown, ChevronRight, Lightbulb, BookOpen, X, GitCommit, RefreshCw
+  ChevronDown, ChevronRight, Lightbulb, BookOpen, X, GitCommit, RefreshCw, Users, User
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { PlanReview } from './PlanReview';
@@ -67,6 +67,8 @@ interface MigrationJob {
   successRate?: number;
   regressionRate?: number;
   approvalRecords?: any[];
+  team?: any;
+  assignedToUser?: any;
   mergeCommitSha?: string;
   revertPrUrl?: string;
   fileChanges: FileChange[];
@@ -653,10 +655,18 @@ const JobDetail: React.FC = () => {
                 Job #{job.id}
               </span>
             </h2>
-            <div style={{ display: 'flex', gap: '24px', fontSize: '0.9rem', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '24px', fontSize: '0.9rem', color: 'var(--text-secondary)', flexWrap: 'wrap', marginTop: '8px' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Clock size={14} /> {new Date(job.createdAt).toLocaleString()}
               </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <User size={14} /> {job.assignedToUser?.username || job.createdBy || 'Unknown User'}
+              </span>
+              {job.team && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Users size={14} /> {job.team.name}
+                </span>
+              )}
               {job.branchName && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Source Migration Branch">
                   <GitBranch size={14} /> {job.branchName}
@@ -1502,18 +1512,46 @@ const JobDetail: React.FC = () => {
             </div>
           )}
 
-          {/* Approval Logs */}
-          {job.approvalRecords && job.approvalRecords.length > 0 && (
-            <div className="glass-panel" style={{ padding: '24px' }}>
-              <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-                <CheckCircle2 size={20} color="#8957e5" /> Approval Logs
-              </h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {job.approvalRecords.map((rec: any, idx: number) => (
-                  <div key={idx} style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #8957e5' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: 600 }}>Approver ID: {rec.approverUserId || 'System'}</span>
+          {/* Activity Log */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
+              <Activity size={20} color="#8957e5" /> Activity Log
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
+              {/* Timeline Line */}
+              <div style={{ position: 'absolute', left: '11px', top: '24px', bottom: '24px', width: '2px', background: 'var(--panel-border)', zIndex: 0 }}></div>
+              
+              {/* Job Started Event */}
+              <div style={{ display: 'flex', gap: '16px', position: 'relative', zIndex: 1 }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#ddf4ff', border: '2px solid #0969da', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0969da' }}></div>
+                </div>
+                <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', flexGrow: 1, border: '1px solid var(--panel-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600 }}>Migration Job Started</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{new Date(job.createdAt).toLocaleString()}</span>
+                  </div>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    Started by {job.assignedToUser?.username || job.createdBy || 'Unknown User'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Approval Events */}
+              {job.approvalRecords && job.approvalRecords
+                .sort((a: any, b: any) => new Date(a.approvedAt).getTime() - new Date(b.approvedAt).getTime())
+                .map((rec: any, idx: number) => (
+                <div key={idx} style={{ display: 'flex', gap: '16px', position: 'relative', zIndex: 1 }}>
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#e6f4ea', border: '2px solid #1a7f37', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                    <CheckCircle2 size={14} color="#1a7f37" />
+                  </div>
+                  <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', flexGrow: 1, border: '1px solid var(--panel-border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 600 }}>Phase {idx + 1} Approved</span>
                       <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{new Date(rec.approvedAt).toLocaleString()}</span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      Approved by {rec.approverUser?.username || rec.approverUserId || 'System'}
                     </div>
                     {rec.executionOverridePrompt && (
                       <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginTop: '8px', padding: '8px', background: '#fff', borderRadius: '4px', border: '1px solid var(--panel-border)' }}>
@@ -1521,10 +1559,10 @@ const JobDetail: React.FC = () => {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Job Tasks */}
           <div className="glass-panel" style={{ padding: '24px' }}>
