@@ -283,6 +283,54 @@ export const Governance: React.FC = () => {
     }
   };
 
+  const TaskCard = ({ task, isGeneratedTask }: { task: MigrationTask, isGeneratedTask?: boolean }) => {
+    const columnColor = getStatusColor(task.status);
+    
+    return (
+      <div 
+        draggable={!isGeneratedTask}
+        onClick={() => setSelectedTask(task)}
+        onDragStart={!isGeneratedTask ? (e) => e.dataTransfer.setData("taskId", task.id.toString()) : undefined}
+        style={{ 
+          background: 'white', 
+          padding: '14px', 
+          borderRadius: '8px', 
+          border: isGeneratedTask ? '1px solid #ffe69c' : '1px solid var(--panel-border)', 
+          borderLeft: isGeneratedTask ? '1px solid #ffe69c' : `4px solid ${columnColor}`,
+          cursor: 'pointer', 
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          position: 'relative',
+          transition: 'transform 0.1s, box-shadow 0.1s',
+          width: isGeneratedTask ? '300px' : 'auto',
+          flex: isGeneratedTask ? '0 0 auto' : undefined,
+          display: 'flex',
+          flexDirection: 'column'
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.08)'; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+          {task.migrationJobId ? (
+            <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: isGeneratedTask ? '#ffe69c' : '#f3f4f6', borderRadius: '4px', color: isGeneratedTask ? '#664d03' : '#4b5563', fontWeight: 600 }}>
+              Job #{task.migrationJobId}
+            </span>
+          ) : <span />}
+          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>TASK-{task.id}</span>
+        </div>
+        <h4 style={{ margin: '0 0 6px 0', fontSize: '0.9rem', color: isGeneratedTask ? '#664d03' : 'var(--text-primary)', lineHeight: 1.4, wordBreak: 'break-word' }}>{task.title}</h4>
+        <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', flex: 1, wordBreak: 'break-word' }}>{task.description}</p>
+        
+        {isGeneratedTask && (
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <button className="btn-primary" style={{ flex: 1, padding: '8px', background: '#1a7f37', border: 'none', color: 'white', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); updateTaskStatus(task.id, 'Todo'); }}>
+              Approve to Todo
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const TaskColumn = ({ title, status }: { title: string, status: string }) => {
     const columnColor = getStatusColor(status);
     const columnBg = getStatusBgColor(status);
@@ -292,6 +340,7 @@ export const Governance: React.FC = () => {
       <div 
         style={{ 
           flex: 1, 
+          minWidth: 0,
           background: '#f6f8fa', 
           borderRadius: '12px', 
           minHeight: '500px',
@@ -320,34 +369,7 @@ export const Governance: React.FC = () => {
         
         <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1, overflowY: 'auto' }}>
           {tasks.filter(t => t.status === status).map(t => (
-            <div 
-              key={t.id} 
-              draggable 
-              onClick={() => setSelectedTask(t)}
-              onDragStart={(e) => e.dataTransfer.setData("taskId", t.id.toString())}
-              style={{ 
-                background: 'white', 
-                padding: '14px', 
-                borderRadius: '8px', 
-                border: '1px solid var(--panel-border)', 
-                borderLeft: `4px solid ${columnColor}`,
-                cursor: 'pointer', 
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                position: 'relative',
-                transition: 'transform 0.1s, box-shadow 0.1s'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.08)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)'; }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.7rem', padding: '2px 6px', background: '#f3f4f6', borderRadius: '4px', color: '#4b5563', fontWeight: 600 }}>
-                  Job #{t.migrationJobId}
-                </span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>TASK-{t.id}</span>
-              </div>
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: 1.4 }}>{t.title}</h4>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.description}</p>
-            </div>
+            <TaskCard key={t.id} task={t} />
           ))}
         </div>
       </div>
@@ -475,26 +497,7 @@ export const Governance: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '8px' }}>
                 {tasks.filter(t => t.status === 'PendingApproval').map(t => (
-                  <div 
-                    key={t.id} 
-                    onClick={() => setSelectedTask(t)}
-                    style={{ background: 'white', padding: '16px', borderRadius: '8px', border: '1px solid #ffe69c', minWidth: '300px', flex: '0 0 auto', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', position: 'relative', cursor: 'pointer', transition: 'transform 0.1s' }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; }}
-                  >
-                    {t.migrationJobId && (
-                      <span style={{ position: 'absolute', top: '16px', right: '16px', fontSize: '0.75rem', padding: '2px 6px', background: '#ffe69c', borderRadius: '4px', color: '#664d03', fontWeight: 600 }}>
-                        Job #{t.migrationJobId}
-                      </span>
-                    )}
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: '1rem', color: '#664d03', paddingRight: '50px' }}>{t.title}</h4>
-                    <p style={{ margin: '0 0 16px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{t.description}</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn-primary" style={{ flex: 1, padding: '8px', background: '#1a7f37' }} onClick={(e) => { e.stopPropagation(); updateTaskStatus(t.id, 'Todo'); }}>
-                        Approve to Todo
-                      </button>
-                    </div>
-                  </div>
+                  <TaskCard key={t.id} task={t} isGeneratedTask />
                 ))}
               </div>
             </div>
