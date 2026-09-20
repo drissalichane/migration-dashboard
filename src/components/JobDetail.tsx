@@ -1051,8 +1051,11 @@ const JobDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Migration Plan Summary */}
-      {plan && (
+      {/* Migration Plan Summary — read-only recap for every stage AFTER review.
+          While the job is awaiting approval, PlanReview above already renders the
+          same risk level, framework updates, package updates and file changes
+          (plus the priority toggles), so showing both duplicates the whole plan. */}
+      {plan && !(job.status === 'Pending Plan Approval' || job.status === 'Failed Execution') && (
         <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
           <h3 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
             <Info size={20} /> Migration Plan Summary
