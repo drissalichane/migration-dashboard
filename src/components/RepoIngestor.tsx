@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Code, ArrowRight, FolderGit2, Search, X, AlertTriangle } from 'lucide-react';
+import { ArrowRight, FolderGit2, Search, X, AlertTriangle } from 'lucide-react';
 
 interface Props {
   onStart: (url: string, branch: string | null, commit: string | null, targetFramework: string, customBranchName: string, customPrompt: string) => void;

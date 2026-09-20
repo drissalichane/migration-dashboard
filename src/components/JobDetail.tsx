@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, CheckCircle, Clock, AlertCircle, FileText, CheckSquare, Search, Terminal, Activity, CheckCircle2,
+  ArrowLeft, CheckCircle, Clock, CheckSquare, Search, Activity, CheckCircle2,
   Archive, RefreshCcw, XCircle, PlayCircle, GitMerge, GitBranch,
   FileCode, Package, AlertTriangle, ExternalLink, Info,
   ChevronDown, ChevronRight, Lightbulb, BookOpen, X, GitCommit, RefreshCw, Users, User
@@ -105,7 +105,6 @@ const JobDetail: React.FC = () => {
   const [loadingFiles, setLoadingFiles] = useState<{[key: string]: boolean}>({});
   const [githubAuthError, setGithubAuthError] = useState(false);
   const [ciStatus, setCiStatus] = useState<any>(null);
-  const [loadingCi, setLoadingCi] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
@@ -188,7 +187,7 @@ const JobDetail: React.FC = () => {
       body: JSON.stringify({ fileEdits: edits })
     })
     .then(r => r.json())
-    .then(data => {
+    .then(() => {
       setJob(prev => prev ? { ...prev, status: 'Rejected' } : null);
     })
     .catch(() => {});

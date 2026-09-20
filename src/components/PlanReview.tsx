@@ -39,6 +39,16 @@ const parseVulnerability = (raw: string) => {
   };
 };
 
+// The analyzer is inconsistent about how it expresses a framework moniker: job 93 and 96
+// emitted "net6.0", job 92 emitted "<TargetFramework>net6.0</TargetFramework>". Both are
+// valid per the schema (they are just strings), so render defensively rather than relying
+// on the model staying consistent.
+const shortenMoniker = (raw: unknown): string => {
+  const s = String(raw ?? '');
+  const tagged = s.match(/<TargetFrameworks?>([^<]+)<\/TargetFrameworks?>/i);
+  return (tagged ? tagged[1] : s).trim();
+};
+
 export const PlanReview: React.FC<Props> = ({ planJson, nugetVulnerabilities, nugetWarnings, onApprove }) => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [localPlan, setLocalPlan] = useState<any>(null);
@@ -215,7 +225,7 @@ export const PlanReview: React.FC<Props> = ({ planJson, nugetVulnerabilities, nu
             <ul style={{ paddingLeft: '20px', fontSize: '14px', lineHeight: '1.6' }}>
               {localPlan.target_framework_updates?.map((u: any, i: number) => (
                 <li key={i}>
-                  <strong>{u.file.split('/').pop()}</strong>: <span style={{ color: '#cf222e', textDecoration: 'line-through' }}>{u.from}</span> &rarr; <span style={{ color: '#1a7f37', fontWeight: 500 }}>{u.to}</span>
+                  <strong>{u.file.split('/').pop()}</strong>: <span style={{ color: '#cf222e', textDecoration: 'line-through' }}>{shortenMoniker(u.from)}</span> &rarr; <span style={{ color: '#1a7f37', fontWeight: 500 }}>{shortenMoniker(u.to)}</span>
                   {renderBadge('must', () => {}, true)}
                 </li>
               ))}

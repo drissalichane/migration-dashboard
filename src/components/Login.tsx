@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, Shield, User } from 'lucide-react';
+import { LogIn, UserPlus, Shield } from 'lucide-react';
 
 interface Props {
   onLogin: (token: string, role: string) => void;

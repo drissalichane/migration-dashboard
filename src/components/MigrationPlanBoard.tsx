@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, FileCode, AlertTriangle, CheckSquare, XSquare, ChevronDown, ChevronRight, Edit3, Save } from 'lucide-react';
+import { FileCode, CheckSquare, ChevronDown, ChevronRight, Edit3, Save } from 'lucide-react';
 
 interface Props {
   show: boolean;

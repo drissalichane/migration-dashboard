@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderGit2, Plus, Users, Search, X } from 'lucide-react';
+import { FolderGit2, Plus, Search, X } from 'lucide-react';
 
 interface GitHubRepository {
   id: number;
@@ -28,7 +28,6 @@ export const Projects: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [githubRepos, setGithubRepos] = useState<GitHubRepository[]>([]);
-  const [repos, setRepos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -53,15 +52,13 @@ export const Projects: React.FC = () => {
     setLoading(true);
     try {
       const username = localStorage.getItem('user_name') || '';
-      const [pRes, uRes, rRes, ghRes] = await Promise.all([
+      const [pRes, uRes, ghRes] = await Promise.all([
         fetch(`http://localhost:5153/api/projects?username=${encodeURIComponent(username)}`),
         fetch('http://localhost:5153/api/users'),
-        fetch('http://localhost:5153/api/migrationjob/repositories'),
         fetch('http://localhost:5153/api/github/repos', { headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` } })
       ]);
       setProjects(await pRes.json());
       setUsers(await uRes.json());
-      setRepos(await rRes.json());
       if (ghRes.ok) {
         const ghData = await ghRes.json();
         if (Array.isArray(ghData)) setGithubRepos(ghData);

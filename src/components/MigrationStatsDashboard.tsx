@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FolderGit2, ArrowRight, BarChart2, Clock, CheckCircle2, XCircle, DollarSign, Cpu } from 'lucide-react';
+import { FolderGit2, ArrowRight, BarChart2, Clock, CheckCircle2, DollarSign, Cpu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const MigrationStatsDashboard: React.FC = () => {
@@ -25,7 +25,6 @@ const MigrationStatsDashboard: React.FC = () => {
   }
 
   // Aggregate stats logic
-  const completedJobs = jobs.filter(j => j.status === 'Completed' || j.status === 'Failed' || j.status === 'Pending_PR_Review' || j.status === 'Pending_Plan_Approval');
   
   const calculateStats = (jobList: any[]) => {
     let totalTime = 0;
@@ -131,7 +130,7 @@ const MigrationStatsDashboard: React.FC = () => {
 
         <h3 style={{ color: 'var(--text-primary)', marginBottom: '20px' }}>Migration Runs ({projectJobs.length})</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {projectJobs.map((job, idx) => (
+          {projectJobs.map((job) => (
             <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'all 0.2s ease', borderLeft: job.isSuccess ? '4px solid #3fb950' : '4px solid #f85149' }}>
               <div>
                 <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>Run #{job.id}</div>

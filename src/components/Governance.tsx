@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Edit, Trash, Save, X, Users, Building, ListTodo, FolderGit2 } from 'lucide-react';
+import { Shield, Plus, Edit, Trash, X, Users, Building, ListTodo, FolderGit2 } from 'lucide-react';
 
 interface Team {
   id: number;
