@@ -1,12 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Play, CheckCircle, Package, GitMerge, FileCode, AlertTriangle, ListTodo } from 'lucide-react';
+import { Play, CheckCircle, Package, GitMerge, FileCode, AlertTriangle, ListTodo, ShieldAlert } from 'lucide-react';
 
 interface Props {
   planJson: string;
+  /** Raw JSON string of string[] as persisted on the job by the NuGet resolver. */
+  nugetVulnerabilities?: string;
+  nugetWarnings?: string;
   onApprove: (customPrompt: string, updatedPlanJson?: string) => void;
 }
 
-export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
+/** The resolver stores these as a JSON-encoded string[]; tolerate null/garbage. */
+const parseStringList = (raw?: string): string[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((x) => String(x)) : [];
+  } catch {
+    return [];
+  }
+};
+
+// NuGet's advisory severity is an int (0=Low, 1=Moderate, 2=High, 3=Critical) and the pipeline
+// formats it into the string verbatim as "pkg 1.2.3: severity=2 https://...". Map it back to a
+// label here rather than showing the raw number.
+const SEVERITY_LABELS = ['Low', 'Moderate', 'High', 'Critical'];
+const SEVERITY_COLORS = ['#57606a', '#9a6700', '#bc4c00', '#cf222e'];
+
+const parseVulnerability = (raw: string) => {
+  const match = raw.match(/^(.*?):\s*severity=(\d+)\s*(\S*)\s*$/);
+  if (!match) return { label: null as string | null, color: '#cf222e', text: raw, url: '' };
+  const [, pkg, severityRaw, url] = match;
+  const severity = Number(severityRaw);
+  return {
+    label: SEVERITY_LABELS[severity] ?? `Severity ${severityRaw}`,
+    color: SEVERITY_COLORS[severity] ?? '#cf222e',
+    text: pkg,
+    url,
+  };
+};
+
+export const PlanReview: React.FC<Props> = ({ planJson, nugetVulnerabilities, nugetWarnings, onApprove }) => {
   const [customPrompt, setCustomPrompt] = useState('');
   const [localPlan, setLocalPlan] = useState<any>(null);
   
@@ -17,6 +50,9 @@ export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
       setLocalPlan(null);
     }
   }, [planJson]);
+
+  const vulnerabilities = parseStringList(nugetVulnerabilities);
+  const warnings = parseStringList(nugetWarnings);
 
   if (!localPlan) {
     return <div className="p-4 text-red-500">Failed to parse migration plan.</div>;
@@ -97,7 +133,57 @@ export const PlanReview: React.FC<Props> = ({ planJson, onApprove }) => {
         </button>
       </div>
       <div className="panel-body">
-        
+
+        {vulnerabilities.length > 0 && (
+          <div style={{ marginBottom: '20px', padding: '12px', borderRadius: '6px', backgroundColor: '#ffebe9', border: '1px solid rgba(255,129,130,0.4)' }}>
+            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#cf222e', margin: '0 0 8px 0' }}>
+              <ShieldAlert size={18} />
+              Known NuGet Vulnerabilities ({vulnerabilities.length})
+            </h4>
+            <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#57606a' }}>
+              These packages carry published advisories. Execution is not blocked — review them before approving.
+            </p>
+            <ul style={{ paddingLeft: '20px', fontSize: '13px', lineHeight: '1.7', margin: 0 }}>
+              {vulnerabilities.map((v, i) => {
+                const { label, color, text, url } = parseVulnerability(v);
+                return (
+                  <li key={i}>
+                    {label && (
+                      <span style={{
+                        display: 'inline-block', fontSize: '11px', padding: '1px 7px', borderRadius: '12px',
+                        fontWeight: 600, textTransform: 'uppercase', marginRight: '8px',
+                        backgroundColor: color, color: 'white'
+                      }}>
+                        {label}
+                      </span>
+                    )}
+                    <span style={{ fontFamily: 'monospace' }}>{text}</span>
+                    {url && (
+                      <a href={url} target="_blank" rel="noreferrer" style={{ marginLeft: '8px', color: '#0969da', fontSize: '12px' }}>
+                        advisory
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {warnings.length > 0 && (
+          <div style={{ marginBottom: '20px', padding: '12px', borderRadius: '6px', backgroundColor: '#fff8c5', border: '1px solid rgba(212,167,44,0.4)' }}>
+            <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9a6700', margin: '0 0 8px 0' }}>
+              <AlertTriangle size={18} />
+              NuGet Resolver Warnings ({warnings.length})
+            </h4>
+            <ul style={{ paddingLeft: '20px', fontSize: '13px', lineHeight: '1.7', margin: 0, color: '#57606a' }}>
+              {warnings.map((w, i) => (
+                <li key={i} style={{ fontFamily: 'monospace' }}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div style={{ marginBottom: '20px' }}>
           <h4 style={{ margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileCode size={18} /> Execution Override Prompt (Optional)

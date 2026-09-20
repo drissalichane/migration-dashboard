@@ -235,6 +235,7 @@ const RepoIngestor: React.FC<Props> = ({ onStart, isStarted }) => {
               >
                 <option value="net8.0">.NET 8.0 (LTS)</option>
                 <option value="net9.0">.NET 9.0</option>
+                <option value="net10.0">.NET 10.0</option>
               </select>
             </div>
             

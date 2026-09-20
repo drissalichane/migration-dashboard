@@ -50,6 +50,10 @@ interface MigrationJob {
   commitHash?: string;
   targetBranch?: string;
   targetCommit?: string;
+  targetFramework?: string;
+  sourceFramework?: string;
+  nugetWarnings?: string;
+  nugetVulnerabilities?: string;
   executionReport?: string;
   isArchived?: boolean;
   llmUsageLogs?: any[];
@@ -110,9 +114,14 @@ const JobDetail: React.FC = () => {
 
   const [logs, setLogs] = useState<any[]>([]);
   const [expandedLogs, setExpandedLogs] = useState<number[]>([]);
+  const [approveError, setApproveError] = useState<string | null>(null);
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(true);
   const terminalRef = React.useRef<HTMLDivElement>(null);
+  const autoScroll = React.useRef(true);
 
+  // Polls the job while it is in a state the pipeline can move on its own. Depends on the current
+  // status as well as the id, so that approving a plan (Pending Plan Approval -> Executing) restarts
+  // polling instead of leaving the page frozen on a stale status until a manual refresh.
   useEffect(() => {
     let interval: any;
     const fetchJob = () => {
@@ -139,23 +148,37 @@ const JobDetail: React.FC = () => {
     interval = setInterval(fetchJob, 3000);
 
     return () => clearInterval(interval);
-  }, [id]);
+  }, [id, job?.status]);
 
-  const handleApprovePlan = (customPrompt: string, updatedPlanJson?: string) => {
+  const handleApprovePlan = async (customPrompt: string, updatedPlanJson?: string) => {
     if (!job) return;
-    fetch(`http://localhost:5153/api/migrationjob/${job.id}/execute`, {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ updatedPlanJson })
-    })
-    .then(r => r.json())
-    .then(data => {
+    setApproveError(null);
+    try {
+      const res = await fetch(`http://localhost:5153/api/migrationjob/${job.id}/execute`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ updatedPlanJson, customPrompt })
+      });
+
+      // fetch only rejects on network failure, so an HTTP error still lands here.
+      // Without this check the UI would optimistically flip to "Executing" on a refusal.
+      if (!res.ok) {
+        let message = `Execution request failed (HTTP ${res.status}).`;
+        try {
+          const body = await res.json();
+          message = body.message || body.Message || message;
+        } catch {}
+        setApproveError(message);
+        return;
+      }
+
       setJob(prev => prev ? { ...prev, status: 'Executing' } : null);
-    })
-    .catch(() => {});
+    } catch {
+      setApproveError('Could not reach the backend. Check that the API is running on port 5153.');
+    }
   };
 
   const handleRejectCode = (jobId: number, edits: any[]) => {
@@ -250,7 +273,7 @@ const JobDetail: React.FC = () => {
   }, [job?.status, job?.id]);
 
   useEffect(() => {
-    if (terminalRef.current && isTerminalExpanded) {
+    if (terminalRef.current && isTerminalExpanded && autoScroll.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [logs, isTerminalExpanded]);
@@ -671,6 +694,12 @@ const JobDetail: React.FC = () => {
                   <Users size={14} /> {job.team.name}
                 </span>
               )}
+              {job.targetFramework && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Framework migration path">
+                  <GitMerge size={14} />
+                  {job.sourceFramework ? `${job.sourceFramework} → ${job.targetFramework}` : job.targetFramework}
+                </span>
+              )}
               {job.branchName && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }} title="Source Migration Branch">
                   <GitBranch size={14} /> {job.branchName}
@@ -838,7 +867,26 @@ const JobDetail: React.FC = () => {
       {/* Plan Review rendering when Pending Plan Approval or Failed Execution */}
       {(job.status === 'Pending Plan Approval' || job.status === 'Failed Execution') && job.migrationPlanJson && (
         <div style={{ marginBottom: '24px' }}>
-          <PlanReview planJson={job.migrationPlanJson} onApprove={handleApprovePlan} />
+          {approveError && (
+            <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: '12px', background: '#ffebe9', borderLeft: '4px solid #cf222e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <span style={{ color: '#cf222e', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={18} /> {approveError}
+              </span>
+              <button
+                onClick={() => setApproveError(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cf222e', display: 'flex', alignItems: 'center' }}
+                title="Dismiss"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          <PlanReview
+            planJson={job.migrationPlanJson}
+            nugetVulnerabilities={job.nugetVulnerabilities}
+            nugetWarnings={job.nugetWarnings}
+            onApprove={handleApprovePlan}
+          />
         </div>
       )}
 
@@ -872,6 +920,10 @@ const JobDetail: React.FC = () => {
         {isTerminalExpanded && (
           <div 
             ref={terminalRef}
+            onScroll={(e) => {
+              const t = e.currentTarget;
+              autoScroll.current = Math.abs(t.scrollHeight - t.clientHeight - t.scrollTop) < 50;
+            }}
             style={{ 
               background: '#0d1117', color: '#c9d1d9', padding: '16px', 
               fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.6',
