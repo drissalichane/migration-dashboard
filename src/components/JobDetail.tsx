@@ -672,6 +672,12 @@ const JobDetail: React.FC = () => {
   const statusStyle = getStatusStyle(job.status);
   const isCompleted = job.status.includes('Approved') || job.status.includes('Done') || job.status.includes('Merged') || job.status.includes('Closed') || job.status.includes('Archived');
 
+  // The job's own target - never a hardcoded ".NET 8": the platform migrates to any version.
+  const targetTfm = job.targetFramework || 'net8.0';
+  const targetVersion = targetTfm.replace(/^net/i, '');                 // "9.0"
+  const targetLabel = `.NET ${targetVersion.replace(/\.0$/, '')}`;      // ".NET 9"
+  const fallbackBranch = `migration/${targetTfm.replace('.0', '')}-${job.id}`;  // what /approve names it
+
   // Shown above the plan review and above the PR review - only one is on screen at a time.
   const errorBanner = approveError && (
     <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: '12px', background: '#ffebe9', borderLeft: '4px solid #cf222e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
@@ -1262,7 +1268,7 @@ const JobDetail: React.FC = () => {
                   <BookOpen size={16} /> 2. Run Tests Locally
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  Checkout the migration branch (<code style={{ background: '#e8e8e8', padding: '2px 6px', borderRadius: '4px' }}>{job.branchName || 'migration/net8-' + job.id}</code>) 
+                  Checkout the migration branch (<code style={{ background: '#e8e8e8', padding: '2px 6px', borderRadius: '4px' }}>{job.branchName || fallbackBranch}</code>) 
                   and run <code style={{ background: '#e8e8e8', padding: '2px 6px', borderRadius: '4px' }}>dotnet build</code> and 
                   <code style={{ background: '#e8e8e8', padding: '2px 6px', borderRadius: '4px' }}> dotnet test</code> to verify everything compiles and passes.
                 </p>
@@ -1273,7 +1279,7 @@ const JobDetail: React.FC = () => {
                   <BookOpen size={16} /> 3. Check for Runtime Behavior Changes
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  .NET 8 introduced changes in JSON serialization defaults, middleware ordering, and minimal API hosting. 
+                  Moving to {targetLabel} can change runtime defaults (JSON serialization, middleware ordering, hosting) without any compile error.
                   Test your application's endpoints and workflows end-to-end before merging.
                 </p>
               </div>
@@ -1283,8 +1289,8 @@ const JobDetail: React.FC = () => {
                   <BookOpen size={16} /> 4. Update CI/CD Pipeline
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                  After merging, update your CI/CD pipeline (GitHub Actions, Azure DevOps, etc.) to use the .NET 8 SDK. 
-                  Update your Docker base images to <code style={{ background: '#e8e8e8', padding: '2px 6px', borderRadius: '4px' }}>mcr.microsoft.com/dotnet/aspnet:8.0</code>.
+                  After merging, update your CI/CD pipeline (GitHub Actions, Azure DevOps, etc.) to use the {targetLabel} SDK.
+                  Update your Docker base images to <code style={{ background: '#e8e8e8', padding: '2px 6px', borderRadius: '4px' }}>mcr.microsoft.com/dotnet/aspnet:{targetVersion}</code>.
                 </p>
               </div>
 
@@ -1837,7 +1843,7 @@ const JobDetail: React.FC = () => {
                 Are you sure you want to revert this migration?
               </p>
               <div style={{ padding: '16px', background: '#ffebe9', borderRadius: '8px', marginBottom: '24px', fontSize: '0.9rem', color: '#cf222e', border: '1px solid rgba(207,34,46,0.3)' }}>
-                This action will automatically generate a new Pull Request on GitHub that undoes all the .NET 8 changes introduced by this migration.
+                This action will automatically generate a new Pull Request on GitHub that undoes all the changes introduced by this migration.
               </div>
               <p style={{ margin: '0 0 24px 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                 Note: Your target branch will not be immediately affected. You will still need to review and merge the generated Revert PR on GitHub.
