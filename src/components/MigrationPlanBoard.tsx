@@ -65,7 +65,9 @@ const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status
 
             return {
               ...fc,
-              selected: true,
+              // A saved draft ("Reject & Save") records unticked edits; showing them all
+              // ticked again would silently re-apply them on "Create PR".
+              selected: fc.accepted,
               rawNewCode: fc.replacementContent,
               diffs
             };

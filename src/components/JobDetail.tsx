@@ -114,6 +114,7 @@ const JobDetail: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [expandedLogs, setExpandedLogs] = useState<number[]>([]);
   const [approveError, setApproveError] = useState<string | null>(null);
+  const [prSubmitting, setPrSubmitting] = useState(false);
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(true);
   const terminalRef = React.useRef<HTMLDivElement>(null);
   const autoScroll = React.useRef(true);
@@ -180,31 +181,59 @@ const JobDetail: React.FC = () => {
     }
   };
 
-  const handleRejectCode = (jobId: number, edits: any[]) => {
-    fetch(`http://localhost:5153/api/migrationjob/${jobId}/reject-save`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileEdits: edits })
-    })
-    .then(r => r.json())
-    .then(() => {
-      setJob(prev => prev ? { ...prev, status: 'Rejected' } : null);
-    })
-    .catch(() => {});
+  // The backend answers errors as JSON ({ message }) or as a bare string.
+  const readError = async (res: Response, fallback: string) => {
+    const text = await res.text().catch(() => '');
+    try {
+      const body = JSON.parse(text);
+      return (typeof body === 'string' ? body : body.message || body.Message) || fallback;
+    } catch {
+      return text || fallback;
+    }
   };
 
-  const handleApproveCode = (jobId: number, edits: any[]) => {
-    setPrStatus('approved');
-    fetch(`http://localhost:5153/api/migrationjob/${jobId}/approve`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fileEdits: edits })
-    })
-    .then(r => r.json())
-    .then(data => {
+  const handleRejectCode = async (jobId: number, edits: any[]) => {
+    setApproveError(null);
+    try {
+      const res = await fetch(`http://localhost:5153/api/migrationjob/${jobId}/reject-save`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileEdits: edits })
+      });
+      if (!res.ok) {
+        setApproveError(await readError(res, `Saving the draft failed (HTTP ${res.status}).`));
+        return;
+      }
+      setJob(prev => prev ? { ...prev, status: 'Rejected' } : null);
+    } catch {
+      setApproveError('Could not reach the backend. Check that the API is running on port 5153.');
+    }
+  };
+
+  const handleApproveCode = async (jobId: number, edits: any[]) => {
+    if (prSubmitting) return;
+    setApproveError(null);
+    setPrSubmitting(true);
+    try {
+      const res = await fetch(`http://localhost:5153/api/migrationjob/${jobId}/approve`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileEdits: edits })
+      });
+      // Success is shown only once the backend confirms it. It refuses a review choice it
+      // cannot apply, and this used to flip to "PR created" before it had even answered.
+      if (!res.ok) {
+        setApproveError(await readError(res, `Creating the pull request failed (HTTP ${res.status}).`));
+        return;
+      }
+      const data = await res.json();
+      setPrStatus('approved');
       setJob(prev => prev ? { ...prev, status: 'Approved and PR Created', prUrl: data.prUrl } : null);
-    })
-    .catch(() => setPrStatus('pending'));
+    } catch {
+      setApproveError('Could not reach the backend. Check that the API is running on port 5153.');
+    } finally {
+      setPrSubmitting(false);
+    }
   };
 
   const fetchCiStatus = (intervalId?: any) => {
@@ -643,6 +672,22 @@ const JobDetail: React.FC = () => {
   const statusStyle = getStatusStyle(job.status);
   const isCompleted = job.status.includes('Approved') || job.status.includes('Done') || job.status.includes('Merged') || job.status.includes('Closed') || job.status.includes('Archived');
 
+  // Shown above the plan review and above the PR review - only one is on screen at a time.
+  const errorBanner = approveError && (
+    <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: '12px', background: '#ffebe9', borderLeft: '4px solid #cf222e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+      <span style={{ color: '#cf222e', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <AlertTriangle size={18} /> {approveError}
+      </span>
+      <button
+        onClick={() => setApproveError(null)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cf222e', display: 'flex', alignItems: 'center' }}
+        title="Dismiss"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
       {/* Back button */}
@@ -866,20 +911,7 @@ const JobDetail: React.FC = () => {
       {/* Plan Review rendering when Pending Plan Approval or Failed Execution */}
       {(job.status === 'Pending Plan Approval' || job.status === 'Failed Execution') && job.migrationPlanJson && (
         <div style={{ marginBottom: '24px' }}>
-          {approveError && (
-            <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: '12px', background: '#ffebe9', borderLeft: '4px solid #cf222e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-              <span style={{ color: '#cf222e', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertTriangle size={18} /> {approveError}
-              </span>
-              <button
-                onClick={() => setApproveError(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#cf222e', display: 'flex', alignItems: 'center' }}
-                title="Dismiss"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          )}
+          {errorBanner}
           <PlanReview
             planJson={job.migrationPlanJson}
             nugetVulnerabilities={job.nugetVulnerabilities}
@@ -891,6 +923,12 @@ const JobDetail: React.FC = () => {
 
       {(job.status === 'Pending PR Review' || job.status === 'Rejected') && (
         <div style={{ marginBottom: '24px' }}>
+          {errorBanner}
+          {prSubmitting && (
+            <div className="glass-panel" style={{ padding: '14px 16px', marginBottom: '12px', background: '#f6f8fa', borderLeft: '4px solid var(--accent-purple)', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
+              Creating the pull request… If you changed or unticked any edit, the code is rebuilt first, which can take a minute.
+            </div>
+          )}
           <MigrationPlanBoard show={true} jobId={job.id} status={prStatus} onApprove={handleApproveCode} onReject={handleRejectCode} jobStatus={job.status} />
         </div>
       )}
