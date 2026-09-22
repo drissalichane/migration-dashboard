@@ -131,7 +131,7 @@ export const Projects: React.FC = () => {
                 <h3 style={{ margin: 0 }}>{p.name}</h3>
                 <span className="badge" style={{ background: '#e6f4ea', color: '#1a7f37' }}>Active</span>
               </div>
-              <a href={p.repositoryUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-purple)', fontSize: '0.9rem', textDecoration: 'none' }}>
+              <a href={p.repositoryUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-purple)', fontSize: '0.9rem', textDecoration: 'none', wordBreak: 'break-all' }}>
                 {p.repositoryUrl}
               </a>
               
