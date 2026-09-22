@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FileCode, CheckSquare, ChevronDown, ChevronRight, Edit3, Save } from 'lucide-react';
+import { DiffView, DiffModeToggle } from './DiffView';
+import { useDiffMode, diffLines, countChanges } from './diff';
 
 interface Props {
   show: boolean;
@@ -10,13 +12,6 @@ interface Props {
   jobStatus?: string;
 }
 
-interface DiffLine {
-  type: 'unchanged' | 'added' | 'removed';
-  oldLine?: number;
-  newLine?: number;
-  content: string;
-}
-
 interface FileChange {
   id: number;
   filePath: string;
@@ -24,11 +19,10 @@ interface FileChange {
   targetContent: string;
   replacementContent: string;
   accepted: boolean;
-  
+
   // UI specific
   selected: boolean;
   rawNewCode: string;
-  diffs: DiffLine[];
 }
 
 const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status, jobStatus, jobId }) => {
@@ -50,28 +44,13 @@ const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status
     .then(data => {
       const job = data.find((j: any) => j.id === jobId);
       if (job) {
-          const formattedFiles = job.fileChanges.map((fc: any) => {
-            // Very simple diff generation for MVP
-            const diffs: DiffLine[] = [];
-            const oldLines = fc.targetContent.split('\n');
-            const newLines = fc.replacementContent.split('\n');
-            
-            oldLines.forEach((l: string, i: number) => {
-              diffs.push({ type: 'removed', oldLine: i+1, content: l });
-            });
-            newLines.forEach((l: string, i: number) => {
-              diffs.push({ type: 'added', newLine: i+1, content: l });
-            });
-
-            return {
-              ...fc,
-              // A saved draft ("Reject & Save") records unticked edits; showing them all
-              // ticked again would silently re-apply them on "Create PR".
-              selected: fc.accepted,
-              rawNewCode: fc.replacementContent,
-              diffs
-            };
-          });
+          const formattedFiles = job.fileChanges.map((fc: any) => ({
+            ...fc,
+            // A saved draft ("Reject & Save") records unticked edits; showing them all
+            // ticked again would silently re-apply them on "Create PR".
+            selected: fc.accepted,
+            rawNewCode: fc.replacementContent
+          }));
           setFiles(formattedFiles);
           setExpandedFiles(formattedFiles.map((f: any) => f.filePath));
         }
@@ -87,6 +66,10 @@ const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status
   useEffect(() => {
     fetchJobData();
   }, [show, jobId]);
+
+  const [diffMode, setDiffMode] = useDiffMode();
+  // Against the reviewer's text (rawNewCode), so a hand edit shows as a change.
+  const rowsById = useMemo(() => new Map(files.map(f => [f.id, diffLines(f.targetContent, f.rawNewCode)])), [files]);
 
   if (!show) return null;
 
@@ -188,6 +171,7 @@ const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status
             <FileCode size={20} color="var(--primary)" />
             <h3 style={{ margin: 0, fontWeight: 600 }}>Pull Request Diffs</h3>
             {loading && <span style={{ marginLeft: '12px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Loading...</span>}
+            <span style={{ marginLeft: 'auto' }}><DiffModeToggle mode={diffMode} onChange={setDiffMode} /></span>
             {loadError && (
               <button 
                 onClick={fetchJobData} 
@@ -220,6 +204,15 @@ const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status
                       {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                       {f.filePath}
                     </button>
+                    {(() => {
+                      const c = countChanges(rowsById.get(f.id) || []);
+                      return (
+                        <span style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                          <span style={{ color: '#1a7f37' }}>+{c.added}</span>{' '}
+                          <span style={{ color: '#cf222e' }}>−{c.removed}</span>
+                        </span>
+                      );
+                    })()}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     {status === 'pending' && (
@@ -246,30 +239,7 @@ const MigrationPlanBoard: React.FC<Props> = ({ show, onApprove, onReject, status
                         spellCheck={false}
                       />
                     ) : (
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: '0.85rem', lineHeight: '1.4' }}>
-                        <tbody>
-                          {f.diffs.map((line, idx) => {
-                            let rowBg = '#ffffff';
-                            let textColor = 'var(--text-primary)';
-                            let prefix = ' ';
-                            
-                            if (line.type === 'added') {
-                              rowBg = '#e6ffec'; textColor = '#1a7f37'; prefix = '+';
-                            } else if (line.type === 'removed') {
-                              rowBg = '#ffebe9'; textColor = '#cf222e'; prefix = '-';
-                            }
-
-                            return (
-                              <tr key={idx} style={{ background: rowBg }}>
-                                <td style={{ width: '40px', padding: '0 10px', textAlign: 'right', color: '#999', borderRight: '1px solid #f0f0f0' }}>{line.oldLine || ''}</td>
-                                <td style={{ width: '40px', padding: '0 10px', textAlign: 'right', color: '#999', borderRight: '1px solid #f0f0f0' }}>{line.newLine || ''}</td>
-                                <td style={{ width: '20px', padding: '0 8px', color: textColor }}>{prefix}</td>
-                                <td style={{ padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: textColor }}>{line.content}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      <DiffView rows={rowsById.get(f.id) || []} mode={diffMode} />
                     )}
                   </div>
                 )}

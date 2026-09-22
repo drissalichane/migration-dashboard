@@ -9,6 +9,9 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { PlanReview } from './PlanReview';
 import MigrationPlanBoard from './MigrationPlanBoard';
+import { DiffView, DiffModeToggle } from './DiffView';
+import { useDiffMode, diffLines, countChanges, parseUnifiedDiff } from './diff';
+import type { ParsedFile } from './diff';
 
 interface Commit {
   sha: string;
@@ -101,8 +104,12 @@ const JobDetail: React.FC = () => {
   const [deleteBranch, setDeleteBranch] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const [fileContents, setFileContents] = useState<{[key: string]: string}>({});
-  const [loadingFiles, setLoadingFiles] = useState<{[key: string]: boolean}>({});
+  // What the workspace actually changed - the same `git diff` the PR is committed from
+  // (POST /api/files/diff). It replaced fetching each whole file from the PR branch on
+  // GitHub, which only worked once a PR existed and printed the entire file per edit.
+  const [workspaceDiff, setWorkspaceDiff] = useState<ParsedFile[] | null>(null);
+  const [diffUnavailable, setDiffUnavailable] = useState(false);
+  const [diffMode, setDiffMode] = useDiffMode();
   const [githubAuthError, setGithubAuthError] = useState(false);
   const [ciStatus, setCiStatus] = useState<any>(null);
   const [isArchiving, setIsArchiving] = useState(false);
@@ -149,6 +156,30 @@ const JobDetail: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [id, job?.status]);
+
+  // The workspace diff, once there are changes to show. Re-read when the status moves:
+  // approving applies the reviewer's choices to the workspace, which changes the diff.
+  const hasFileChanges = !!job?.fileChanges?.length;
+  useEffect(() => {
+    if (!job?.id || !hasFileChanges) return;
+    let cancelled = false;
+    setDiffUnavailable(false);
+    fetch('http://localhost:5153/api/files/diff', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: job.id })
+    })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(data => {
+        if (cancelled) return;
+        const parsed = parseUnifiedDiff(data.diff || '');
+        // New files git does not track yet are not in the diff text; list them too.
+        for (const p of (data.untracked || []) as string[]) parsed.push({ path: p, added: 0, removed: 0, rows: [] });
+        setWorkspaceDiff(parsed);
+      })
+      .catch(() => { if (!cancelled) { setWorkspaceDiff(null); setDiffUnavailable(true); } });
+    return () => { cancelled = true; };
+  }, [job?.id, job?.status, hasFileChanges]);
 
   const handleApprovePlan = async (customPrompt: string, updatedPlanJson?: string) => {
     if (!job) return;
@@ -544,114 +575,8 @@ const JobDetail: React.FC = () => {
     });
   };
 
-    
-  const renderFullFileDiff = (fullFileContent: string, fileChangesForPath: FileChange[]) => {
-    if (!fullFileContent) return null;
-    
-    // We want to find where each replacement is in the full new file.
-    // Since fileChangesForPath contains multiple changes, we process them line by line.
-    const lines = fullFileContent.split('\n');
-    const renderedLines = [];
-    
-    let i = 0;
-    while (i < lines.length) {
-      let matchedChange = null;
-      
-      // Check if current line starts a replacement block
-      for (const fc of fileChangesForPath) {
-        if (!fc.replacementContent) continue;
-        const replacementLines = fc.replacementContent.split('\n');
-        if (replacementLines.length === 0) continue;
-        
-        // Does it match starting at line i?
-        let isMatch = true;
-        for (let j = 0; j < replacementLines.length; j++) {
-          if (i + j >= lines.length || lines[i + j].trim() !== replacementLines[j].trim()) {
-            isMatch = false;
-            break;
-          }
-        }
-        
-        if (isMatch) {
-          matchedChange = fc;
-          break;
-        }
-      }
-      
-      if (matchedChange) {
-        // Render target content (removed) in red
-        const targetLines = matchedChange.targetContent.split('\n');
-        targetLines.forEach((tLine, index) => {
-          renderedLines.push(
-            <tr key={`del-${matchedChange.id}-${index}`} style={{ background: '#ffebe9' }}>
-              <td style={{ width: '40px', padding: '0 10px', textAlign: 'right', color: '#999', borderRight: '1px solid #f0f0f0' }}></td>
-              <td style={{ width: '20px', padding: '0 8px', color: '#cf222e' }}>-</td>
-              <td style={{ padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#cf222e' }}>{tLine}</td>
-            </tr>
-          );
-        });
-        
-        // Render replacement content (added) in green
-        const replacementLines = matchedChange.replacementContent.split('\n');
-        replacementLines.forEach((rLine, index) => {
-          renderedLines.push(
-            <tr key={`add-${matchedChange.id}-${index}`} style={{ background: '#e6ffec' }}>
-              <td style={{ width: '40px', padding: '0 10px', textAlign: 'right', color: '#999', borderRight: '1px solid #f0f0f0' }}>{i + index + 1}</td>
-              <td style={{ width: '20px', padding: '0 8px', color: '#1a7f37' }}>+</td>
-              <td style={{ padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#1a7f37' }}>{rLine}</td>
-            </tr>
-          );
-        });
-        
-        // Advance i by the number of replacement lines we just consumed
-        i += replacementLines.length;
-      } else {
-        // Normal unchanged line
-        renderedLines.push(
-          <tr key={`unchanged-${i}`}>
-            <td style={{ width: '40px', padding: '0 10px', textAlign: 'right', color: '#999', borderRight: '1px solid #f0f0f0' }}>{i + 1}</td>
-            <td style={{ width: '20px', padding: '0 8px' }}></td>
-            <td style={{ padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-primary)' }}>{lines[i]}</td>
-          </tr>
-        );
-        i++;
-      }
-    }
-    
-    return renderedLines;
-  };
-
-
-  const toggleExpand = (filePath: string) => {
-    const isCurrentlyExpanded = expandedFiles.includes(filePath);
-    if (isCurrentlyExpanded) {
-        setExpandedFiles(prev => prev.filter(f => f !== filePath));
-    } else {
-        setExpandedFiles(prev => [...prev, filePath]);
-        if (!fileContents[filePath] && job?.branchName) {
-            const repoParts = job.repositoryUrl.replace('https://github.com/', '').replace('.git', '').split('/');
-            setLoadingFiles(prev => ({...prev, [filePath]: true}));
-            fetch(`http://localhost:5153/api/github/repos/${repoParts[0]}/${repoParts[1]}/contents?path=${encodeURIComponent(filePath)}&refBranch=${job.branchName}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
-            })
-            .then(async r => {
-                if (!r.ok) {
-                    const txt = await r.text();
-                    throw new Error(txt);
-                }
-                return r.json();
-            })
-            .then(data => {
-                setFileContents(prev => ({...prev, [filePath]: data.content ? data.content : 'Failed to decode file.'}));
-                setLoadingFiles(prev => ({...prev, [filePath]: false}));
-            })
-            .catch((err) => {
-                if (err.message?.includes('Bad credentials') || err.message?.includes('Unauthorized')) setGithubAuthError(true);
-                setFileContents(prev => ({...prev, [filePath]: 'Failed to fetch file.'}));
-                setLoadingFiles(prev => ({...prev, [filePath]: false}));
-            });
-        }
-    }
+  const toggleExpand = (key: string) => {
+    setExpandedFiles(prev => prev.includes(key) ? prev.filter(f => f !== key) : [...prev, key]);
   };
 
   const getStatusStyle = (status: string) => {
@@ -1186,59 +1111,65 @@ const JobDetail: React.FC = () => {
         </div>
       )}
 
-      {/* File Change Diffs */}
-      {job.fileChanges && job.fileChanges.length > 0 && (
-        <div className="glass-panel" style={{ padding: '0', overflow: 'hidden', marginBottom: '24px' }}>
-          <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <FileCode size={20} />
-            <h3 style={{ margin: 0, fontWeight: 600 }}>Code Changes ({job.fileChanges.length} files)</h3>
+      {/* File Change Diffs: one entry per file from the workspace diff, or per recorded edit if it could not be read */}
+      {job.fileChanges && job.fileChanges.length > 0 && (() => {
+        const entries = workspaceDiff
+          ? workspaceDiff.map(f => ({
+              key: f.path, path: f.path, rows: f.rows, added: f.added, removed: f.removed,
+              note: f.binary ? 'binary file' : f.rows.length === 0 ? 'new file' : undefined
+            }))
+          : job.fileChanges.map(fc => {
+              const rows = diffLines(fc.targetContent, fc.replacementContent);
+              const c = countChanges(rows);
+              return { key: `fc-${fc.id}`, path: fc.filePath, rows, added: c.added, removed: c.removed,
+                       note: fc.accepted ? undefined : 'withdrawn by the reviewer' };
+            });
+        return (
+          <div className="glass-panel" style={{ padding: '0', overflow: 'hidden', marginBottom: '24px' }}>
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <FileCode size={20} />
+              <h3 style={{ margin: 0, fontWeight: 600 }}>Code Changes ({entries.length} {workspaceDiff ? (entries.length === 1 ? 'file' : 'files') : (entries.length === 1 ? 'edit' : 'edits')})</h3>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                {workspaceDiff ? 'from the workspace diff: what the PR commits'
+                  : diffUnavailable ? 'the workspace diff could not be read, so each recorded edit is shown' : 'loading the workspace diff…'}
+              </span>
+              <span style={{ marginLeft: 'auto' }}><DiffModeToggle mode={diffMode} onChange={setDiffMode} /></span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', padding: '16px', gap: '12px' }}>
+              {entries.map(e => {
+                const isExpanded = expandedFiles.includes(e.key);
+                return (
+                  <div key={e.key} style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                    <button
+                      onClick={() => toggleExpand(e.key)}
+                      style={{
+                        width: '100%', padding: '12px 16px', background: 'white', border: 'none',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        cursor: 'pointer', borderBottom: isExpanded ? '1px solid var(--panel-border)' : 'none'
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'monospace', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        {e.path}
+                      </span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                        {e.note && <span style={{ color: 'var(--text-secondary)', marginRight: '8px' }}>{e.note}</span>}
+                        <span style={{ color: '#1a7f37' }}>+{e.added}</span>{' '}
+                        <span style={{ color: '#cf222e' }}>−{e.removed}</span>
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
+                        <DiffView rows={e.rows} mode={diffMode} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', padding: '16px', gap: '12px' }}>
-            {job.fileChanges.map(fc => {
-              const isExpanded = expandedFiles.includes(fc.filePath);
-              return (
-                <div key={fc.id} style={{ border: '1px solid var(--panel-border)', borderRadius: '8px', overflow: 'hidden' }}>
-                  <button
-                    onClick={() => toggleExpand(fc.filePath)}
-                    style={{ 
-                      width: '100%', padding: '12px 16px', background: 'white', border: 'none',
-                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                      cursor: 'pointer', borderBottom: isExpanded ? '1px solid var(--panel-border)' : 'none'
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'monospace', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-                      {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      {fc.filePath}
-                    </span>
-                    <span style={{ 
-                      fontSize: '0.8rem', padding: '2px 8px', borderRadius: '12px',
-                      background: fc.accepted ? '#e6f4ea' : '#ffebe9',
-                      color: fc.accepted ? '#1a7f37' : '#cf222e'
-                    }}>
-                      {fc.accepted ? 'Accepted' : 'Rejected'}
-                    </span>
-                  </button>
-                  {isExpanded && (
-                    <div style={{ overflowX: 'auto', maxHeight: '500px', overflowY: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: '0.8rem', lineHeight: '1.5' }}>
-                        <tbody>
-                          {loadingFiles[fc.filePath] ? (
-                            <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading full file from GitHub...</td></tr>
-                          ) : fileContents[fc.filePath] ? (
-                            renderFullFileDiff(fileContents[fc.filePath], job.fileChanges.filter(f => f.filePath === fc.filePath))
-                          ) : (
-                            <tr><td colSpan={3} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Failed to load full file.</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Next Steps - shown when migration is completed */}
       {isCompleted && (
