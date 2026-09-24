@@ -59,6 +59,8 @@ interface MigrationJob {
   nugetVulnerabilities?: string;
   executionReport?: string;
   isArchived?: boolean;
+  n8nExecutionIdPhase1?: string;
+  n8nExecutionIdPhase2?: string;
   llmUsageLogs?: any[];
   nodeExecutionLogs?: any[];
   repositoryProfileJson?: string;
@@ -123,6 +125,44 @@ const JobDetail: React.FC = () => {
   const [approveError, setApproveError] = useState<string | null>(null);
   const [prSubmitting, setPrSubmitting] = useState(false);
   const [isTerminalExpanded, setIsTerminalExpanded] = useState(true);
+
+  // Telemetry comes from n8n's own execution records - the provider's real token counts and
+  // per-node wall clock, not the workflow's len/3 estimate. Refreshing re-reads it; a job that
+  // ran before the workflows reported their execution id needs that id supplied once.
+  const [telemetryRefreshing, setTelemetryRefreshing] = useState(false);
+  const [telemetryMessage, setTelemetryMessage] = useState<string | null>(null);
+  const [backfillP1, setBackfillP1] = useState('');
+  const [backfillP2, setBackfillP2] = useState('');
+
+  const handleRefreshTelemetry = async () => {
+    setTelemetryRefreshing(true);
+    setTelemetryMessage(null);
+    try {
+      const res = await fetch(`http://localhost:5153/api/migrationjob/${id}/telemetry/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` },
+        body: JSON.stringify({
+          phase1ExecutionId: backfillP1.trim() || undefined,
+          phase2ExecutionId: backfillP2.trim() || undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setTelemetryMessage(data?.message || 'Could not read telemetry from n8n.');
+      } else {
+        const failed = (data.results || []).filter((r: any) => !r.ok);
+        setTelemetryMessage(failed.length ? failed.map((r: any) => r.message).join(' ') : null);
+        const fresh = await fetch(`http://localhost:5153/api/migrationjob/${id}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('jwt_token')}` }
+        }).then(r => r.json());
+        setJob(fresh);
+      }
+    } catch (e: any) {
+      setTelemetryMessage(e?.message || 'Could not reach the backend.');
+    } finally {
+      setTelemetryRefreshing(false);
+    }
+  };
   const terminalRef = React.useRef<HTMLDivElement>(null);
   const autoScroll = React.useRef(true);
 
@@ -1011,7 +1051,7 @@ const JobDetail: React.FC = () => {
 
             {job.llmUsageLogs && job.llmUsageLogs.length > 0 && (
               <div style={{ padding: '16px', background: '#f6f8fa', borderRadius: '8px', borderLeft: '4px solid #0550ae' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Total Cost (USD)</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '8px' }} title="Tokens x OpenRouter list price. n8n records no cost, so this is an estimate - OpenRouter's activity tab is what was billed.">Est. Cost (USD)</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>${(job.llmUsageLogs.reduce((acc, log) => acc + (log.totalCostUsd || 0), 0)).toFixed(4)}</div>
               </div>
             )}
@@ -1462,90 +1502,193 @@ const JobDetail: React.FC = () => {
             </div>
           )}
 
-          {/* LLM Telemetry & Node Timings Row */}
-          {((job.llmUsageLogs && job.llmUsageLogs.length > 0) || (job.nodeExecutionLogs && job.nodeExecutionLogs.length > 0)) && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-              {/* LLM Telemetry (Cost & Time) */}
-              {job.llmUsageLogs && job.llmUsageLogs.length > 0 && (
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h3 style={{ margin: '0 0 16px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Activity size={18} /> LLM Telemetry & Costs
-                  </h3>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--panel-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
-                          <th style={{ padding: '8px' }}>Time</th>
-                          <th style={{ padding: '8px' }}>Agent</th>
-                          <th style={{ padding: '8px' }}>LLM</th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>Tokens</th>
-                          <th style={{ padding: '8px', textAlign: 'right' }}>Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {job.llmUsageLogs.map((log: any, idx: number) => (
-                          <tr key={idx} style={{ borderBottom: '1px solid var(--panel-border)', fontSize: '0.9rem' }}>
-                            <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{new Date(log.createdAt).toLocaleTimeString()}</td>
-                            <td style={{ padding: '8px', color: 'var(--text-primary)' }}>{log.agentName}</td>
-                            <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>{log.modelName || log.provider}</td>
-                            <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{log.totalTokens?.toLocaleString()}</td>
-                            <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', color: '#1a7f37' }}>${(log.totalCostUsd || 0).toFixed(4)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan={4} style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600 }}>Total:</td>
-                          <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: '#1a7f37' }}>
-                            ${job.llmUsageLogs.reduce((acc: number, log: any) => acc + (log.totalCostUsd || 0), 0).toFixed(4)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Node Timings */}
-              {job.nodeExecutionLogs && job.nodeExecutionLogs.length > 0 && (
-                <div className="glass-panel" style={{ padding: '24px' }}>
-                  <h2 style={{ margin: '0 0 16px 0', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: 'var(--text-primary)' }}>
-                    <Clock size={20} color="#0969da" /> Agent Node Timings
-                  </h2>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid var(--panel-border)' }}>
-                        <th style={{ padding: '8px 4px' }}>Phase</th>
-                        <th style={{ padding: '8px 4px' }}>Node Name</th>
-                        <th style={{ padding: '8px 4px' }}>Execution Time</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {job.nodeExecutionLogs.map((node: any, idx: number) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--panel-border)' }}>
-                          <td style={{ padding: '8px 4px' }}>
-                            <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', background: node.phase === 'Phase1' ? '#ddf4ff' : '#e6f4ea', color: node.phase === 'Phase1' ? '#0969da' : '#1a7f37' }}>
-                              {node.phase}
-                            </span>
-                          </td>
-                          <td style={{ padding: '8px 4px', fontWeight: 500 }}>{node.nodeName}</td>
-                          <td style={{ padding: '8px 4px' }}>{(node.executionTimeMs / 1000).toFixed(2)}s</td>
-                        </tr>
-                      ))}
-                      {(job.nodeExecutionLogs?.length || 0) > 0 && (
-                        <tr style={{ background: '#f6f8fa' }}>
-                          <td colSpan={2} style={{ padding: '8px 4px', fontWeight: 600, textAlign: 'right' }}>Total Execution Time:</td>
-                          <td style={{ padding: '8px 4px', fontWeight: 600, color: '#0969da' }}>
-                            {(job.nodeExecutionLogs.reduce((acc: number, cur: any) => acc + (cur.executionTimeMs || 0), 0) / 1000).toFixed(2)}s
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+          {/* Pipeline telemetry, read from n8n's own execution records. n8n stores the provider's
+              real token counts per LLM call and wall clock per node; the backend pulls them over
+              n8n's REST API once a run finishes. Cost is the one part n8n does not record. */}
+          <div className="glass-panel" style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} /> Pipeline Telemetry
+              </h3>
+              <button
+                className="btn-secondary"
+                onClick={handleRefreshTelemetry}
+                disabled={telemetryRefreshing}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '6px 12px' }}
+              >
+                <RefreshCw size={14} /> {telemetryRefreshing ? 'Reading n8n…' : 'Refresh from n8n'}
+              </button>
             </div>
-          )}
+
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '10px 0 18px 0', lineHeight: 1.6 }}>
+              Tokens and timings are <strong>measured</strong> — read from n8n's execution record, which holds the
+              provider's own usage numbers for every call. Cost is <strong>estimated</strong>: n8n records no cost and
+              keeps no generation id to look one up with, so it is tokens × OpenRouter list price. For what was
+              actually billed, use OpenRouter's activity tab.
+            </div>
+
+            {telemetryMessage && (
+              <div style={{ padding: '10px 12px', borderRadius: '6px', background: '#fff8c5', border: '1px solid #d4a72c', color: '#7d4e00', fontSize: '0.8rem', marginBottom: '16px' }}>
+                {telemetryMessage}
+              </div>
+            )}
+
+            {/* Backfill: jobs that ran before the workflows reported their execution id.
+                Find the id in n8n's execution list. */}
+            {(!job.n8nExecutionIdPhase1 && !job.n8nExecutionIdPhase2) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '18px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                <span>No n8n execution is linked to this job yet. Enter the ids from n8n's execution list to backfill:</span>
+                <input className="input-field" style={{ width: '140px', padding: '4px 8px', fontSize: '0.8rem' }}
+                  placeholder="Part 1 exec id" value={backfillP1} onChange={(e) => setBackfillP1(e.target.value)} />
+                <input className="input-field" style={{ width: '140px', padding: '4px 8px', fontSize: '0.8rem' }}
+                  placeholder="Part 2 exec id" value={backfillP2} onChange={(e) => setBackfillP2(e.target.value)} />
+              </div>
+            )}
+
+            {(() => {
+              const llmLogs: any[] = job.llmUsageLogs || [];
+              const nodeLogs: any[] = job.nodeExecutionLogs || [];
+              if (llmLogs.length === 0 && nodeLogs.length === 0) {
+                return (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                    No telemetry recorded for this job yet.
+                  </div>
+                );
+              }
+
+              const sum = (rows: any[], field: string) => rows.reduce((a: number, r: any) => a + (r[field] || 0), 0);
+              const phaseLabel = (p: string) => (p === 'Analyze' ? 'Part 1' : p === 'Execute' ? 'Part 2' : p || '—');
+              const phaseChip = (p: string) => (
+                <span style={{
+                  padding: '2px 8px', borderRadius: '12px', fontSize: '0.72rem', whiteSpace: 'nowrap',
+                  background: p === 'Execute' ? '#e6f4ea' : '#ddf4ff',
+                  color: p === 'Execute' ? '#1a7f37' : '#0969da'
+                }}>{phaseLabel(p)}</span>
+              );
+
+              // A node wired under an agent (its LLM, its tools) runs inside that agent's own
+              // time, so summing every row would double-count. Only main-flow nodes make the total.
+              const mainNodes = nodeLogs.filter((n) => !n.isSubNode).sort((a, b) => (b.executionTimeMs || 0) - (a.executionTimeMs || 0));
+              const subNodes = nodeLogs.filter((n) => n.isSubNode).sort((a, b) => (b.executionTimeMs || 0) - (a.executionTimeMs || 0));
+
+              const th: React.CSSProperties = { padding: '8px 6px', fontWeight: 600 };
+              const thR: React.CSSProperties = { ...th, textAlign: 'right' };
+              const td: React.CSSProperties = { padding: '8px 6px' };
+              const tdR: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'monospace' };
+
+              return (
+                <>
+                  {llmLogs.length > 0 && (
+                    <div style={{ overflowX: 'auto', marginBottom: '28px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '1px solid var(--panel-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                            <th style={th}>Phase</th>
+                            <th style={th}>Agent</th>
+                            <th style={th}>Model</th>
+                            <th style={thR}>Calls</th>
+                            <th style={thR}>Prompt</th>
+                            <th style={thR}>Completion</th>
+                            <th style={thR}>Total</th>
+                            <th style={thR}>LLM time</th>
+                            <th style={thR}>Est. cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {llmLogs.map((log: any, idx: number) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid var(--panel-border)' }}>
+                              <td style={td}>{phaseChip(log.phase)}</td>
+                              <td style={{ ...td, color: 'var(--text-primary)', fontWeight: 500 }}>{log.agentName}</td>
+                              <td style={{ ...td, color: 'var(--text-secondary)', fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                {log.modelName || '—'}
+                                {!log.isMeasured && (
+                                  <span title="n8n recorded no provider usage for these calls; the numbers are n8n's own estimate."
+                                    style={{ marginLeft: '6px', color: '#9a6700' }}>estimated</span>
+                                )}
+                                {log.finishReasons && log.finishReasons.includes('length') && (
+                                  <div title="A reply hit the model's token ceiling and was cut off - that is how a Reporter run can come back empty."
+                                    style={{ color: '#cf222e', fontSize: '0.7rem', marginTop: '2px' }}>
+                                    truncated ({log.finishReasons})
+                                  </div>
+                                )}
+                              </td>
+                              <td style={tdR}>{log.calls || '—'}</td>
+                              <td style={tdR}>{(log.promptTokens || 0).toLocaleString()}</td>
+                              <td style={tdR}>{(log.completionTokens || 0).toLocaleString()}</td>
+                              <td style={{ ...tdR, fontWeight: 600 }}>{(log.totalTokens || 0).toLocaleString()}</td>
+                              <td style={tdR}>{log.durationMs ? (log.durationMs / 1000).toFixed(1) + 's' : '—'}</td>
+                              <td style={{ ...tdR, color: '#1a7f37' }}>${(log.totalCostUsd || 0).toFixed(4)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr style={{ background: '#f6f8fa' }}>
+                            <td colSpan={3} style={{ ...td, fontWeight: 600, textAlign: 'right' }}>Total</td>
+                            <td style={{ ...tdR, fontWeight: 600 }}>{sum(llmLogs, 'calls').toLocaleString()}</td>
+                            <td style={{ ...tdR, fontWeight: 600 }}>{sum(llmLogs, 'promptTokens').toLocaleString()}</td>
+                            <td style={{ ...tdR, fontWeight: 600 }}>{sum(llmLogs, 'completionTokens').toLocaleString()}</td>
+                            <td style={{ ...tdR, fontWeight: 600 }}>{sum(llmLogs, 'totalTokens').toLocaleString()}</td>
+                            <td style={{ ...tdR, fontWeight: 600 }}>{(sum(llmLogs, 'durationMs') / 1000).toFixed(1)}s</td>
+                            <td style={{ ...tdR, fontWeight: 600, color: '#1a7f37' }}>
+                              ${llmLogs.reduce((a: number, l: any) => a + (l.totalCostUsd || 0), 0).toFixed(4)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+
+                  {nodeLogs.length > 0 && (
+                    <div>
+                      <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)' }}>
+                        <Clock size={16} color="#0969da" /> Node Timings
+                      </h4>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+                        The total counts main-flow nodes only. An agent's model and tools run inside that agent's
+                        own time, so they are listed separately rather than added twice.
+                      </div>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--panel-border)', textAlign: 'left', color: 'var(--text-secondary)' }}>
+                              <th style={th}>Phase</th>
+                              <th style={th}>Node</th>
+                              <th style={thR}>Runs</th>
+                              <th style={thR}>Time</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mainNodes.map((node: any, idx: number) => (
+                              <tr key={'m' + idx} style={{ borderBottom: '1px solid var(--panel-border)' }}>
+                                <td style={td}>{phaseChip(node.phase)}</td>
+                                <td style={{ ...td, fontWeight: 500 }}>{node.nodeName}</td>
+                                <td style={tdR}>{node.runs > 1 ? node.runs : ''}</td>
+                                <td style={tdR}>{((node.executionTimeMs || 0) / 1000).toFixed(2)}s</td>
+                              </tr>
+                            ))}
+                            <tr style={{ background: '#f6f8fa' }}>
+                              <td colSpan={3} style={{ ...td, fontWeight: 600, textAlign: 'right' }}>Main-flow total</td>
+                              <td style={{ ...tdR, fontWeight: 600, color: '#0969da' }}>
+                                {(sum(mainNodes, 'executionTimeMs') / 1000).toFixed(2)}s
+                              </td>
+                            </tr>
+                            {subNodes.map((node: any, idx: number) => (
+                              <tr key={'s' + idx} style={{ borderBottom: '1px solid var(--panel-border)', opacity: 0.75 }}>
+                                <td style={td}>{phaseChip(node.phase)}</td>
+                                <td style={{ ...td, paddingLeft: '22px', color: 'var(--text-secondary)' }}>↳ {node.nodeName}</td>
+                                <td style={tdR}>{node.runs > 1 ? node.runs : ''}</td>
+                                <td style={{ ...tdR, color: 'var(--text-secondary)' }}>{((node.executionTimeMs || 0) / 1000).toFixed(2)}s</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
 
           {/* Activity Log */}
           <div className="glass-panel" style={{ padding: '24px' }}>
