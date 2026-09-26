@@ -4,7 +4,7 @@ The web app of the .NET Migration Platform: start a migration, review the AI-gen
 the run live, and review the code before the pull request is opened.
 
 **To run the platform, follow the guide in the backend repository:**
-[migration-backend → README](https://github.com/drissalichane/migration-backend#readme). It runs this
+[migration-backend → README](https://github.com/drissalichane/migration-backend#readme) ([version française](https://github.com/drissalichane/migration-backend/blob/main/README.fr.md)). It runs this
 dashboard, the API and n8n together with Docker Compose — clone this repository next to it as
 `migration_dashboard`.
 
