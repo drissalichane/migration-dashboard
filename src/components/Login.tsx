@@ -135,6 +135,10 @@ const Login: React.FC<Props> = ({ onLogin }) => {
                 <option value="Manager">Manager (Approver)</option>
                 <option value="Admin">Admin (Full Access)</option>
               </select>
+              <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                Testing the platform? Choose <strong>Admin</strong> to have access to every feature. Developer is
+                read-only.
+              </p>
             </div>
           )}
 
